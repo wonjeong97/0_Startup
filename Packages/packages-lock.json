@@ -114,6 +114,15 @@
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
+    "com.unity.inputsystem": {
+      "version": "1.14.2",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.uielements": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.mathematics": {
       "version": "1.2.6",
       "depth": 1,
@@ -231,7 +240,7 @@
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "3d65070f7a0509811f4648c15d59d3aa9ab2ef06"
+      "hash": "e2880d863834098c5cdb9a8f437672186a5aab65"
     },
     "jp.hadashikick.vcontainer": {
       "version": "1.18.0",
