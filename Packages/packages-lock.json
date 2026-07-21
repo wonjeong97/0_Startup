@@ -94,13 +94,6 @@
       },
       "url": "https://packages.unity.com"
     },
-    "com.unity.collab-proxy": {
-      "version": "2.12.4",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {},
-      "url": "https://packages.unity.com"
-    },
     "com.unity.ext.nunit": {
       "version": "2.0.2",
       "depth": 1,
@@ -134,7 +127,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.inputsystem": {
-      "version": "1.19.0",
+      "version": "1.20.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -275,8 +268,21 @@
       "version": "https://github.com/wonjeong97/Template.git",
       "depth": 0,
       "source": "git",
-      "dependencies": {},
-      "hash": "6272c176b16f2b7079f75019a3160b3c310259f2"
+      "dependencies": {
+        "com.unity.addressables": "1.29.0",
+        "com.unity.inputsystem": "1.19.0",
+        "com.unity.ugui": "1.0.0",
+        "com.unity.modules.audio": "1.0.0",
+        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.modules.imgui": "1.0.0",
+        "com.unity.modules.jsonserialize": "1.0.0",
+        "com.unity.modules.unitywebrequest": "1.0.0",
+        "com.unity.modules.unitywebrequestaudio": "1.0.0",
+        "com.unity.modules.video": "1.0.0",
+        "com.unity.test-framework": "1.4.6",
+        "com.unity.textmeshpro": "3.0.9"
+      },
+      "hash": "36a3fc4fa36ad661f8093994c86f41e24e337fad"
     },
     "jp.hadashikick.vcontainer": {
       "version": "1.19.0",
