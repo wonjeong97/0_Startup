@@ -46,10 +46,16 @@ public static class PackageUpdater
                 _updateQueue.Enqueue(pkg.packageId);
                 Debug.Log($"[PackageUpdater] Git 패키지 갱신 예정: {pkg.name}");
             }
-            else if (!string.IsNullOrEmpty(pkg.versions.latest) && pkg.versions.latest != pkg.version)
+            else
             {
-                _updateQueue.Enqueue($"{pkg.name}@{pkg.versions.latest}");
-                Debug.Log($"[PackageUpdater] 업데이트 예정: {pkg.name}  {pkg.version} → {pkg.versions.latest}");
+                // 현재 에디터 호환 최신 버전만 대상. versions.latest는 호환성을 무시해
+                // Unity 6 전용 버전(예: TMP 4.x, visualscripting 1.9.12)까지 끌어온다.
+                string target = pkg.versions.latestCompatible;
+                if (!string.IsNullOrEmpty(target) && target != pkg.version)
+                {
+                    _updateQueue.Enqueue($"{pkg.name}@{target}");
+                    Debug.Log($"[PackageUpdater] 업데이트 예정: {pkg.name}  {pkg.version} → {target}");
+                }
             }
         }
 
