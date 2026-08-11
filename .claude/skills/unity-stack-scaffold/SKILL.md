@@ -175,3 +175,30 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   }
   ```
 - 반대로 씬별로 조정 가능한 튜닝 값(페이드 시간, 타이핑 속도 등)은 그대로 SerializeField로 둔다. 중앙화 대상은 "정체성(식별자)"이지 "인스턴스별 조정 파라미터"가 아니다.
+
+## 13. 테스트 작성 기준 (UTF)
+
+이 스킬로 매니저/시스템 클래스를 스캐폴딩하거나 수정할 때, 아래 조건에 해당하면 `Tests/Runtime`에 대응하는 `[UnityTest]`를 같이 작성한다. 조건에 해당하지 않으면 테스트를 만들지 않는다 — 모든 클래스에 테스트를 강제하지 않는다.
+
+**테스트가 필요한 경우:**
+- `Time.timeScale`, `SetUpdate(true)`처럼 타이밍/일시정지에 영향을 받는 로직 (예: 페이드, 연출)
+- 상태 플래그(`_isTransitioning` 등)로 중복 호출을 막는 로직 — 플래그가 해제되지 않으면 이후 호출이 전부 무시되는 소프트락 위험이 있는 코드
+- 여러 곳에서 동시에 호출될 수 있는 캐싱/중복 방지 로직 (`SoundManager`의 `_activeDownloads` 패턴 등)
+- 과거에 버그가 발생했던 지점을 수정하는 경우 (회귀 방지)
+
+**테스트가 필요 없는 경우:**
+- 단순 getter/setter, DI 등록 코드, 데이터 클래스
+- Inspector 값 대입만 하는 초기화 코드
+
+**작성 패턴** (`FadeManagerTests.cs` 표준을 따른다):
+```csharp
+[UnityTest]
+public IEnumerator 설명은_한글_평서형으로() => UniTask.ToCoroutine(async () =>
+{
+    await AwaitWithRealtimeTimeout(_target.SomeAsync());
+    Assert.IsFalse(GetIsTransitioning(), "플래그가 해제되지 않아 이후 호출이 무시됨");
+});
+```
+- 비동기 완료 대기는 반드시 `UniTask.WhenAny(task, UniTask.Delay(..., DelayType.UnscaledDeltaTime))`로 실시간 타임아웃을 건다. 가드가 없으면 결함이 있는 구현에서 테스트가 "실패"가 아니라 "무한 대기"로 멈춰 테스트 러너 전체를 막는다.
+- `[TearDown]`에서 `Time.timeScale` 등 건드린 전역 상태를 반드시 원복한다.
+- private 필드 검증에 새 리플렉션 코드를 추가하지 않는다(9번 규칙과 동일한 이유). 이미 `NonPublic` 리플렉션이 쓰인 기존 헬퍼가 있으면 재사용하되, 새로 만들 경우 가능하면 공개 상태/이벤트로 노출하는 걸 우선 고려한다.
