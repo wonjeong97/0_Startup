@@ -110,7 +110,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.ide.visualstudio": {
-      "version": "2.0.27",
+      "version": "2.0.28",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -274,7 +274,7 @@
         "com.unity.test-framework": "1.4.6",
         "com.unity.textmeshpro": "3.0.9"
       },
-      "hash": "55390577249ef341fe61ad65506864669d7db41d"
+      "hash": "43a359b170f1b33711cbdc1c15534f05e0e59ebb"
     },
     "jp.hadashikick.vcontainer": {
       "version": "1.19.0",
