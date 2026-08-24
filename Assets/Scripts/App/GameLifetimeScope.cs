@@ -1,9 +1,9 @@
-using Huliac.Core;
+using Core;
 using VContainer;
 using VContainer.Unity;
 using Wonjeong.App;
 
-namespace Huliac.App
+namespace App
 {
     /// <summary>
     /// 프로젝트 전용 루트 DI 스코프.

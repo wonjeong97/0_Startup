@@ -1,6 +1,6 @@
 using Wonjeong.Core;
 
-namespace Huliac.Core
+namespace Core
 {
     /// <summary>
     /// 프로젝트 전용 게임 매니저.
