@@ -1,4 +1,6 @@
 {
+  "useInactivityTimer": false,
+  "resetTime": 20,
   "targetFrameRate": 60,
   "apiUrl": "",
   "closeSetting": {
