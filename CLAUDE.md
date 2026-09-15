@@ -63,3 +63,16 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+## Project Convention: CHANGELOG.md
+
+관람객·운영자 경험에 영향을 주는 변경이 머지될 때마다 저장소 루트의 `CHANGELOG.md`를 갱신할 것.
+
+- [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식(`Added`/`Changed`/`Fixed`/`Removed`)을 따름.
+- 내부 리팩터링, 오타 수정, 에디터 전용 작업 상태 등 사용자에게 영향 없는 변경은 기록하지 않음.
+- 호환성이 깨지는 변경이 있으면 해당 섹션 최상단에 별도로 강조함.
+- 각 항목은 한 문장으로 간결하게 작성함.
+- 아직 main에 머지되지 않은 변경은 `[Unreleased]` 섹션에 기록하고, 머지되면 날짜 섹션(`## [YYYY-MM-DD]`)으로 옮김.
+- 상세 절차는 `.claude/skills/changelog/SKILL.md` 참고.
