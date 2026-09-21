@@ -2,8 +2,8 @@ using System;
 using MessagePipe;
 using UnityEngine.SceneManagement;
 using VContainer;
-using Wonjeong.App;
-using Wonjeong.Core;
+using HuliacDev.App;
+using HuliacDev.Core;
 
 namespace Core
 {

@@ -1,7 +1,7 @@
 using Core;
 using VContainer;
 using VContainer.Unity;
-using Wonjeong.App;
+using HuliacDev.App;
 
 namespace App
 {
