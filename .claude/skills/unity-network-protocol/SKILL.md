@@ -47,6 +47,7 @@ description: Unity networking and packet synchronization guidelines — transpor
 - **주의점**:
   - 패킷 내부에는 참조 타입(`string`, `object`, 맨 `byte[]` 등)을 직접 포함하지 않는다. 관리 배열 필드는 데이터가 아니라 **포인터**로 배치되므로, `Marshal.SizeOf`는 배열 내용 대신 포인터 크기(4/8바이트)를 세고 `Marshal.StructureToPtr`은 힙 주소를 복사한다. 수신 측은 그 자리에서 쓰레기 바이트를 읽는다.
   - 고정 길이 바이트 배열이 필요하면 인라인 마샬링을 명시한다: `[MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)] public byte[] payload;` (또는 unsafe 컨텍스트에서 `fixed byte payload[16];`). 그 외에는 Blittable 기본 타입만 포함한다.
+    - 둘 중 고를 때 기준은 GC다. `ByValArray`는 구조체를 비Blittable로 만들고 역직렬화할 때마다 관리 힙에 `byte[]`를 새로 할당하므로, 초당 수십~수백 패킷이 오가는 핫패스에서는 `fixed byte`가 유리하다(구조체 안에 데이터가 인라인으로 남아 할당이 0). 대신 `fixed`는 `unsafe` 컨텍스트가 필요하다.
   - 타 기기(Big-Endian)와 통신하는 경우 정수/실수의 엔디언(Endianness) 변환을 확인한다 (`BitConverter.IsLittleEndian`).
   - 필드 순서는 상대방과 합의한 와이어 포맷 그대로 둔다. 패딩을 줄이겠다고 바이트 크기순으로 재정렬하지 않는다(unity-stack-scaffold 14번의 정렬 규칙은 패킷에 적용되지 않는다).
 - **변환은 직접 짜지 않고 `HuliacDev.Network.PacketUtility`를 쓴다.** `Marshal.AllocHGlobal`/`PtrToStructure` 보일러플레이트를 매번 재작성하면 오프셋·버퍼 길이 검증이 빠지기 쉽다.
@@ -103,7 +104,15 @@ description: Unity networking and packet synchronization guidelines — transpor
               // 올라온 채 그대로 돌면 블로킹 수신 구현에서 메인 스레드가 멈춘다.
               await UniTask.SwitchToThreadPool();
 
-              await ReceiveFromSocketAsync(buffer, ct);
+              int bytesRead = await ReceiveFromSocketAsync(buffer, ct);
+
+              // TCP는 상대가 정상 종료(graceful close)하면 0바이트를 반환한다.
+              // 이 가드가 없으면 연결이 끊긴 뒤 루프가 0바이트를 무한히 읽으며 CPU를 태운다.
+              if (bytesRead <= 0)
+              {
+                  break;
+              }
+
               PlayerMovePacket packet = PacketUtility.FromBytes<PlayerMovePacket>(buffer);
 
               // Unity 메인 스레드로 전환하여 씬 상태 반영

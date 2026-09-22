@@ -54,7 +54,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 - 사용자가 도중에 취소할 수 있는 흐름(페이드, 연출 등)은 별도 `CancellationTokenSource`를 만들어 관리한다:
   ```csharp
   _fadeCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
-  FadeOutAsync(duration, _fadeCts).Forget();
+  FadeOutAsync(duration, _fadeCts.Token).Forget();
   ```
   이렇게 링크하면 오브젝트 파괴 시 자동 취소와 수동 취소(`_fadeCts.Cancel()`) 둘 다 동작한다. `try { ... } catch (OperationCanceledException) { ... } finally { _fadeCts?.Dispose(); _fadeCts = null; }` 형태로 정리한다.
 - **다중 대기 태스크 캐싱은 `UniTask` 대신 `Task`를 사용한다**: `UniTask`는 구조체 기반이라 awaiter를 한 번만 등록할 수 있다. 특히 **로드가 아직 진행 중인 상태에서** 여러 소비자가 같은 `UniTask<T>`를 동시에 `await`하면 continuation이 중복 등록되어 `InvalidOperationException("Already continuation registered")`가 발생하며, `.Preserve()`로도 이 경우는 해결되지 않는다. 부팅 시 여러 매니저가 같은 리소스를 동시에 요청하는 상황이 정확히 여기 해당한다. 따라서 로더/다운로더/설정 제공자는 다중 awaiter를 기본 지원하는 `Task<T>`로 캐싱한다 — 키별 캐시는 `Dictionary<string, Task<T>>`(`SoundManager`의 `_activeDownloads`), 단일 리소스는 `Task<T>` 필드 하나(`AppSettingsProvider`의 `_loadTask`)가 그 패턴이다.
@@ -108,16 +108,16 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   ```csharp
   await _panel.DOAnchorPosY(0f, 0.3f).SetEase(Ease.OutCubic);
   ```
-- **UniTask와 연동해서 await 한다** (3번의 취소 토큰 규칙을 그대로 따른다). `UNITASK_DOTWEEN_SUPPORT` define이 켜져 있어 `DOTweenAsyncExtensions`를 쓸 수 있다. 대기는 `ToUniTask(cancellationToken: ...)`로 통일한다 — 템플릿 표준 패턴이고, `WithCancellation`과 달리 취소 시 동작(`TweenCancelBehaviour`)을 연출별로 지정할 수 있다.
+- **UniTask와 연동해서 await 한다** (3번의 취소 토큰 규칙을 그대로 따른다). `UNITASK_DOTWEEN_SUPPORT` define이 켜져 있어 `DOTweenAsyncExtensions`를 쓸 수 있다. 대기는 `ToUniTask(TweenCancelBehaviour.KillAndCancelAwait, cancellationToken: ...)`로 통일한다 — 템플릿 표준 패턴이고, `WithCancellation`과 달리 취소 시 동작(`TweenCancelBehaviour`)을 연출별로 지정할 수 있다.
 - **`SetUpdate(true)`는 연출 성격에 따라 구분한다.** `Time.timeScale`을 무시하는 옵션이므로, 페이드/일시정지 메뉴/로딩처럼 timeScale이 0이어도 돌아야 하는 UI·시스템 연출에만 붙이고, 일시정지·슬로모션을 따라야 하는 게임플레이 연출에는 붙이지 않는다:
   ```csharp
   // UI/시스템 연출 (timeScale 0에서도 동작해야 함)
   await _canvasGroup.DOFade(1f, 0.3f).SetUpdate(true)
-      .ToUniTask(cancellationToken: this.GetCancellationTokenOnDestroy());
+      .ToUniTask(TweenCancelBehaviour.KillAndCancelAwait, this.GetCancellationTokenOnDestroy());
 
   // 게임플레이 연출 (일시정지/슬로모션을 따라야 함) — SetUpdate 없이
   await transform.DOMove(target, 1f)
-      .ToUniTask(cancellationToken: this.GetCancellationTokenOnDestroy());
+      .ToUniTask(TweenCancelBehaviour.KillAndCancelAwait, this.GetCancellationTokenOnDestroy());
   ```
   `yield return tween.WaitForCompletion()` 같은 코루틴 대기는 쓰지 않는다.
 - **생성한 트윈은 반드시 수명을 묶는다.** 4번(MessagePipe 구독 해제), 5번(R3 구독 해제)과 같은 이유로, 해제를 빼먹으면 파괴된 오브젝트를 트윈이 계속 건드리다 예외가 난다.
