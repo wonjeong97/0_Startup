@@ -171,7 +171,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 여러 파일에서 참조하는 문자열 상수 — 특히 **씬 이름**, StreamingAssets 파일 이름처럼 "식별자" 성격의 값 — 은 각 클래스에 `[SerializeField] private string xxxSceneName = "..."` 기본값이나 리터럴로 흩어놓지 않고, 프로젝트 쪽 `App.Constants` 같은 **static 클래스 한 곳에 const로 모아** 참조한다. 씬 이름과 파일 이름은 프로젝트마다 다른 식별자이므로 이 클래스는 **프로젝트 어셈블리에 두고, 템플릿 패키지(`HuliacDev.*`)에는 넣지 않는다.**
 
 - 씬을 리네임하면 `Constants.Scenes` 한 줄만 바꾸면 모든 참조가 따라온다.
-- 씬 이름을 SerializeField로 두면 코드 기본값과 씬에 직렬화된 값이 이원화되어, 씬 파일에 낡은 값이 남은 채로 조용히 잘못된 씬을 로드하는 사고가 난다. 실제로 이 프로젝트에서 씬 번호를 다시 매긴 뒤 `resultSceneName = "3_Result"`, `outroSceneName = "4_Outro"`, `gameSceneName = "2_Game"`이 갱신되지 않아 존재하지 않는 씬을 로드하려던 버그가 있었다. 그래서 씬 이름은 SerializeField를 제거하고 코드에서 `Constants.Scenes.Xxx`를 직접 참조한다.
+- 씬 이름을 SerializeField로 두면 코드 기본값과 씬에 직렬화된 값이 이원화되어, 씬 파일에 낡은 값이 남은 채로 조용히 잘못된 씬을 로드하는 사고가 난다. 실제로 씬을 다시 번호 매긴 뒤 `resultSceneName`, `outroSceneName`, `gameSceneName`에 직렬화되어 있던 예전 이름이 갱신되지 않아, 존재하지 않는 씬을 로드하려던 버그가 있었다. 그래서 씬 이름은 SerializeField를 제거하고 코드에서 `Constants.Scenes.Xxx`를 직접 참조한다.
 - 관심사별 중첩 static 클래스로 묶는다:
   ```csharp
   public static class Constants
