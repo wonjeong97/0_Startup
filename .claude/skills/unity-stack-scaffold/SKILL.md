@@ -79,9 +79,10 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   ```
   - `[클래스명]` 태그를 메시지 맨 앞에 붙인다 — 여러 매니저의 로그가 한 콘솔에 섞여도 어디서 난 건지 바로 구분하기 위함.
   - null이 발생할 수 있는 지점(Fallback이 필요한 지점)마다 `_logger != null` 체크 후 경고/에러 로그를 남긴다. 로그 없이 조용히 return하지 않는다.
-- **if로 조건/참조를 검사하는 모든 곳은 실패 분기(else)에 로그를 남긴다.** `if (someRef != null) { ... }`처럼 성공 분기만 작성하고 else를 생략하면, 조건이 실패했을 때 아무 흔적 없이 조용히 아무 일도 안 일어난다 — 원인 파악이 콘솔 로그가 아니라 코드 리딩으로만 가능해진다.
+- **if로 조건/참조를 검사하는 모든 곳은 실패 분기(else)에 로그를 남긴다.** `if (someRef) { ... }`처럼 성공 분기만 작성하고 else를 생략하면, 조건이 실패했을 때 아무 흔적 없이 조용히 아무 일도 안 일어난다 — 원인 파악이 콘솔 로그가 아니라 코드 리딩으로만 가능해진다.
   ```csharp
-  if (flowController != null)
+  // 씬 참조(MonoBehaviour)는 암시적 bool, 순수 C# 객체인 _logger는 명시적 null 비교.
+  if (flowController)
   {
       flowController.ShowCompletePanel();
   }
@@ -167,7 +168,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 
 ## 12. 상수 중앙 관리 (씬 이름 등)
 
-여러 파일에서 참조하는 문자열 상수 — 특히 **씬 이름**, StreamingAssets 파일 이름처럼 "식별자" 성격의 값 — 은 각 클래스에 `[SerializeField] private string xxxSceneName = "..."` 기본값이나 리터럴로 흩어놓지 않고, `DGAIZone.App.Constants` 같은 **static 클래스 한 곳에 const로 모아** 참조한다.
+여러 파일에서 참조하는 문자열 상수 — 특히 **씬 이름**, StreamingAssets 파일 이름처럼 "식별자" 성격의 값 — 은 각 클래스에 `[SerializeField] private string xxxSceneName = "..."` 기본값이나 리터럴로 흩어놓지 않고, 프로젝트 쪽 `App.Constants` 같은 **static 클래스 한 곳에 const로 모아** 참조한다. 씬 이름과 파일 이름은 프로젝트마다 다른 식별자이므로 이 클래스는 **프로젝트 어셈블리에 두고, 템플릿 패키지(`HuliacDev.*`)에는 넣지 않는다.**
 
 - 씬을 리네임하면 `Constants.Scenes` 한 줄만 바꾸면 모든 참조가 따라온다.
 - 씬 이름을 SerializeField로 두면 코드 기본값과 씬에 직렬화된 값이 이원화되어, 씬 파일에 낡은 값이 남은 채로 조용히 잘못된 씬을 로드하는 사고가 난다. 실제로 이 프로젝트에서 씬 번호를 다시 매긴 뒤 `resultSceneName = "3_Result"`, `outroSceneName = "4_Outro"`, `gameSceneName = "2_Game"`이 갱신되지 않아 존재하지 않는 씬을 로드하려던 버그가 있었다. 그래서 씬 이름은 SerializeField를 제거하고 코드에서 `Constants.Scenes.Xxx`를 직접 참조한다.
