@@ -45,8 +45,21 @@ description: Unity networking and packet synchronization guidelines — transpor
   } // 총 17바이트 (Pack=1이 없으면 CPU 정렬에 의해 20바이트로 패딩될 수 있음)
   ```
 - **주의점**:
-  - 패킷 내부에는 가변 길이 참조 타입(`string`, `object` 등)을 직접 포함하지 말고, 고정 크기 바이트 배열(`byte[]`) 또는 Blittable 기본 타입만 포함한다.
+  - 패킷 내부에는 참조 타입(`string`, `object`, 맨 `byte[]` 등)을 직접 포함하지 않는다. 관리 배열 필드는 데이터가 아니라 **포인터**로 배치되므로, `Marshal.SizeOf`는 배열 내용 대신 포인터 크기(4/8바이트)를 세고 `Marshal.StructureToPtr`은 힙 주소를 복사한다. 수신 측은 그 자리에서 쓰레기 바이트를 읽는다.
+  - 고정 길이 바이트 배열이 필요하면 인라인 마샬링을 명시한다: `[MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)] public byte[] payload;` (또는 unsafe 컨텍스트에서 `fixed byte payload[16];`). 그 외에는 Blittable 기본 타입만 포함한다.
   - 타 기기(Big-Endian)와 통신하는 경우 정수/실수의 엔디언(Endianness) 변환을 확인한다 (`BitConverter.IsLittleEndian`).
+  - 필드 순서는 상대방과 합의한 와이어 포맷 그대로 둔다. 패딩을 줄이겠다고 바이트 크기순으로 재정렬하지 않는다(unity-stack-scaffold 14번의 정렬 규칙은 패킷에 적용되지 않는다).
+- **변환은 직접 짜지 않고 `HuliacDev.Network.PacketUtility`를 쓴다.** `Marshal.AllocHGlobal`/`PtrToStructure` 보일러플레이트를 매번 재작성하면 오프셋·버퍼 길이 검증이 빠지기 쉽다.
+  ```csharp
+  // 수신: 바이트 -> 구조체 (버퍼 길이 부족 시 예외로 걸러짐)
+  PlayerMovePacket packet = PacketUtility.FromBytes<PlayerMovePacket>(buffer);
+
+  // 송신: 구조체 -> 기존 버퍼에 기록 (GC 무할당 오버로드)
+  int written = PacketUtility.ToBytes(in packet, sendBuffer);
+
+  // 버퍼 크기 산정
+  int size = PacketUtility.GetPacketSize<PlayerMovePacket>();
+  ```
 
 ---
 
@@ -79,15 +92,28 @@ description: Unity networking and packet synchronization guidelines — transpor
   ```csharp
   private async UniTaskVoid StartReceiveLoopAsync(CancellationToken ct)
   {
-      while (!ct.IsCancellationRequested)
-      {
-          // 백그라운드 소켓 수신
-          byte[] buffer = await ReceiveFromSocketAsync(ct);
-          var packet = ParsePacket(buffer);
+      // 수신 버퍼는 루프 밖에서 한 번만 확보해 재사용한다 (패킷마다 new byte[] 금지).
+      byte[] buffer = new byte[PacketUtility.GetPacketSize<PlayerMovePacket>()];
 
-          // Unity 메인 스레드로 전환하여 씬 상태 반영
-          await UniTask.SwitchToMainThread(cancellationToken: ct);
-          ApplyPacketToGame(packet);
+      try
+      {
+          while (!ct.IsCancellationRequested)
+          {
+              // 매 회차 시작에 반드시 백그라운드로 내려간다. 직전 회차에서 메인 스레드로
+              // 올라온 채 그대로 돌면 블로킹 수신 구현에서 메인 스레드가 멈춘다.
+              await UniTask.SwitchToThreadPool();
+
+              await ReceiveFromSocketAsync(buffer, ct);
+              PlayerMovePacket packet = PacketUtility.FromBytes<PlayerMovePacket>(buffer);
+
+              // Unity 메인 스레드로 전환하여 씬 상태 반영
+              await UniTask.SwitchToMainThread(cancellationToken: ct);
+              ApplyPacketToGame(packet);
+          }
+      }
+      catch (OperationCanceledException)
+      {
+          // 오브젝트 파괴로 인한 정상적인 취소
       }
   }
   ```

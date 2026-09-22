@@ -7,7 +7,11 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 
 이 스킬은 라이브러리 사용법을 처음부터 설계하는 게 아니라, 이 프로젝트의 `Packages/com.huliacdev.template` (RootLifetimeScope.cs, GameManagerBase.cs, SoundManager.cs)에 이미 정착된 실제 패턴을 재현하기 위한 것이다. 왜 이 방식인지 궁금하면 해당 파일들을 직접 열어 대조해도 된다.
 
-이 스킬은 "어떤 라이브러리를 어떤 순서/형태로 조합하는가"만 다룬다. `GetComponent` 대신 `TryGetComponent`, null 비교 시 암시적 bool, `var` 금지 같은 규칙은 프로젝트 CLAUDE.md가 이미 항상 적용하고 있으므로 여기서 반복하지 않는다.
+이 스킬은 "어떤 라이브러리를 어떤 순서/형태로 조합하는가"를 주로 다루지만, 아래 C# 작성 규칙은 이 스킬이 적용되는 모든 코드에 항상 함께 적용한다.
+
+- **`var` 금지**: 지역 변수도 `Task<Settings> loadTask = ...`처럼 타입을 명시한다. 템플릿 코드 전체가 이 규칙을 지키고 있으므로 `var`를 쓴 코드는 리뷰에서 되돌아온다.
+- **`GetComponent` 대신 `TryGetComponent`**: 실패 시 null이 조용히 전파되어 나중에 엉뚱한 곳에서 NRE가 나는 대신, bool 분기로 그 자리에서 처리한다.
+- **Unity 오브젝트의 null 검사는 암시적 bool**: `if (reporter)` / `if (!inspectorContainer)` 형태를 쓴다. 단 `ILogger`, `CancellationTokenSource` 같은 순수 C# 객체는 `if (_logger != null)`처럼 명시적 비교를 유지한다 — 암시적 bool은 `UnityEngine.Object`의 "파괴됨" 상태까지 잡아주는 연산자이지 일반 객체에는 없는 기능이다.
 
 ## 1. HuliacDev 템플릿 우선 재사용
 
@@ -17,6 +21,8 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 - 사운드/UI/페이드/비디오 관련 요청이면 새로 만들기 전에 `HuliacDev.UI.SoundManager` / `UIManager` / `FadeManager` / `VideoManager`가 이미 그 역할을 하는지 먼저 확인하고, 있으면 확장하거나 그대로 호출한다.
 - 설정/데이터 파일 로딩은 직접 파일 I/O나 JSON 파싱을 짜지 않고 `HuliacDev.Utils.JsonLoader.Load<T>` / `LoadAsync<T>` (`where T : new()`, `.json` 확장자 자동 처리, 실패 시 `new T()` 반환) 또는 VContainer에 등록된 `AppSettingsProvider`를 재사용한다.
 - 전역 DI/로깅/MessagePipe 브로커 등록이 필요하면 완전히 새로운 LifetimeScope를 만들기보다 `HuliacDev.App.RootLifetimeScope`를 상속해 필요한 구성 메서드(`ConfigureLogging`, `ConfigureLogRetention`, `ConfigureMessagePipe`, `ConfigureSettings`, `ConfigureNetwork`, `ConfigureCoreComponents`, `ConfigureOptionalComponents`)만 override하는 걸 우선 고려한다.
+- 상태 머신(FSM)은 `HuliacDev.Core`의 `IState<TContext>` / `StateMachine<TContext>`(및 컨텍스트 없는 `IState` / `StateMachine`)를 쓰고 새로 선언하지 않는다(22번).
+- 바이너리 패킷 ↔ 구조체 변환은 `HuliacDev.Network.PacketUtility`(`FromBytes<T>`, `ToBytes<T>`, GC 무할당 `ToBytes<T>(in T, byte[], offset)`, `GetPacketSize<T>`)를 쓰고 `Marshal` 코드를 직접 짜지 않는다(unity-network-protocol 스킬 참고).
 - 템플릿에 대응되는 게 없는 완전히 새로운 기능일 때만 아래 2~8번 패턴을 따라 처음부터 작성한다.
 
 ## 2. VContainer — DI 등록
@@ -51,7 +57,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   FadeOutAsync(duration, _fadeCts).Forget();
   ```
   이렇게 링크하면 오브젝트 파괴 시 자동 취소와 수동 취소(`_fadeCts.Cancel()`) 둘 다 동작한다. `try { ... } catch (OperationCanceledException) { ... } finally { _fadeCts?.Dispose(); _fadeCts = null; }` 형태로 정리한다.
-- **다중 대기 태스크 캐싱은 `UniTask` 대신 `Task`를 사용한다**: `UniTask`는 구조체 기반이라 완료 후 여러 소비자가 동시에 `await`하면 continuation이 중복 등록되어 `InvalidOperationException("Already continuation registered")`가 발생한다. 따라서 같은 리소스를 여러 곳에서 동시에 요청할 수 있는 로더/다운로더는 다중 awaiter를 지원하는 `Dictionary<string, Task<T>>`로 캐싱한다 (`SoundManager` 및 `AppSettingsProvider`의 `_activeDownloads` 패턴 참고).
+- **다중 대기 태스크 캐싱은 `UniTask` 대신 `Task`를 사용한다**: `UniTask`는 구조체 기반이라 awaiter를 한 번만 등록할 수 있다. 특히 **로드가 아직 진행 중인 상태에서** 여러 소비자가 같은 `UniTask<T>`를 동시에 `await`하면 continuation이 중복 등록되어 `InvalidOperationException("Already continuation registered")`가 발생하며, `.Preserve()`로도 이 경우는 해결되지 않는다. 부팅 시 여러 매니저가 같은 리소스를 동시에 요청하는 상황이 정확히 여기 해당한다. 따라서 로더/다운로더/설정 제공자는 다중 awaiter를 기본 지원하는 `Task<T>`로 캐싱한다 — 키별 캐시는 `Dictionary<string, Task<T>>`(`SoundManager`의 `_activeDownloads`), 단일 리소스는 `Task<T>` 필드 하나(`AppSettingsProvider`의 `_loadTask`)가 그 패턴이다.
 
 ## 4. MessagePipe — 이벤트
 
@@ -117,7 +123,11 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   ```csharp
   transform.DOMove(target, 1f).SetLink(gameObject);
   ```
-  `SetLink`로 오브젝트 파괴 시 자동 Kill 되게 하는 게 기본이다. 무한 반복(`SetLoops(-1)`) 트윈처럼 도중에 직접 멈춰야 하는 건 `Tween` 참조를 필드로 들고 있다가 `_tween?.Kill()`로 정리한다.
+  묶는 방법은 두 가지이고 둘 중 하나는 반드시 쓴다.
+  - **await 하지 않는 트윈**은 `SetLink(gameObject)`로 오브젝트 파괴 시 자동 Kill 되게 한다.
+  - **await 하는 트윈**은 `ToUniTask(TweenCancelBehaviour.KillAndCancelAwait, token)`에 `this.GetCancellationTokenOnDestroy()`(또는 그것과 링크된 CTS)를 넘기면 그 자체로 수명이 묶인다. 파괴·취소 시 트윈이 Kill되고 await도 함께 끊기므로 `SetLink`를 덧붙일 필요가 없다 — `FadeManager`와 `SoundManager`의 페이드가 이 형태다.
+
+  무한 반복(`SetLoops(-1)`) 트윈처럼 도중에 직접 멈춰야 하는 건 `Tween` 참조를 필드로 들고 있다가 `_tween?.Kill()`로 정리한다.
 - 트윈 대상이 없는 순수 수치 보간이나 지연 실행은 빈 GameObject를 만들지 말고 `DOVirtual.Float(...)` / `DOVirtual.DelayedCall(...)`을 쓴다.
 - **무료판이라 TextMeshPro 숏컷이 없다.** `DOText`, TMP `DOColor`/`DOFade`는 Pro 전용이라 이 프로젝트에서 컴파일되지 않는다. TMP 텍스트 연출이 필요하면 `DOVirtual.Float`로 값을 보간해 콜백에서 직접 대입한다.
 
@@ -229,7 +239,8 @@ C#의 참조 타입(`class`)은 CLR이 `[StructLayout(LayoutKind.Auto)]`를 통�
       public byte level;  // 1B + 끝 패딩 2B (8의 배수 정렬)
   }
   ```
-- 특히 C++ 네이티브 플러그인, Compute Shader(HLSL 버퍼), Job System/DOTS, 네트워크 패킷으로 전달되는 구조체는 필드 순서가 어긋나면 메모리 깨짐이 발생하므로 반드시 이 규칙을 준수한다.
+- 특히 C++ 네이티브 플러그인, Compute Shader(HLSL 버퍼), Job System/DOTS에 전달되는 구조체는 양쪽 레이아웃이 어긋나면 메모리 깨짐이 발생하므로 반드시 이 규칙을 준수한다.
+- **단, 네트워크/하드웨어 패킷 구조체에는 이 크기순 재정렬 규칙을 적용하지 않는다.** 패킷의 필드 순서는 상대방(서버, 임베디드 장치)과 합의한 와이어 포맷이 결정하므로, 패딩을 줄이겠다고 순서를 바꾸면 바이트 오프셋이 어긋나 좌표나 센서값이 쓰레기로 해석된다. 패킷은 `Pack = 1`로 패딩을 아예 없애고 프로토콜이 정한 순서를 그대로 따른다(unity-network-protocol 스킬 2번 참고).
 
 ## 15. 비동기 스레드 안전성과 메인 스레드 전환 (UniTask)
 
@@ -288,7 +299,8 @@ C#의 `virtual` 메서드나 인터페이스 호출은 런타임에 객체의 �
   - 람다식이나 이벤트 리스너 내부에서 바깥 스코프의 로컬 변수를 참조(캡처)하면, 컴파일러가 해당 변수를 담기 위한 임시 클래스 인스턴스를 힙에 매번 할당한다.
   - 반복 호출되는 콜백에는 외부 변수를 캡처하지 않는 정적 람다(`static (x) => ...`)를 쓰거나 상태를 매개변수로 명시적 전달한다.
 - **오브젝트 풀링**: 빈번하게 생성/파괴되는 투사체, 대미지 텍스트, 파티클, UI 목록 아이템은 `Instantiate`/`Destroy` 대신 풀링을 적용하여 힙 단편화와 GC 부하를 억제한다.
-- **임시 버퍼 풀링 (`ArrayPool<T>` / `NativeArray Temp`)**: 반복적으로 실행되는 비동기 I/O 패킷 파싱이나 대량 수학 연산에서 `new byte[4096]`처럼 임시 배열을 힙에 반복 생성하지 않는다. `System.Buffers.ArrayPool<T>.Shared.Rent(size)`로 대여 후 `Return`하거나, 유니티의 스택 기반 네이티브 얼로케이터인 `NativeArray<T>(count, Allocator.Temp)`를 활용하여 GC 발생을 원천 차단한다.
+- **임시 버퍼 풀링 (`ArrayPool<T>`)**: 반복적으로 실행되는 비동기 I/O 패킷 파싱이나 대량 수학 연산에서 `new byte[4096]`처럼 임시 배열을 힙에 반복 생성하지 않는다. `System.Buffers.ArrayPool<T>.Shared.Rent(size)`로 대여한 뒤 `finally`에서 반드시 `Return`한다. 수신 버퍼처럼 수명이 명확한 것은 루프 밖에서 한 번 할당해 재사용하는 것으로 충분하다.
+  - `NativeArray<T>(count, Allocator.Temp)`는 **동기 루프 안에서 그 프레임 안에 다 쓰고 버릴 때만** 쓴다. Temp는 프레임·스레드 스코프 얼로케이터라 `await`를 사이에 끼면 다음 프레임이나 다른 스레드에서 재개될 때 이미 해제된 메모리를 가리키게 되어 "The NativeArray has been deallocated" 오류나 네이티브 메모리 손상이 발생한다(세이프티 체크가 꺼진 빌드에서는 조용히 깨진다). 비동기 경로에는 `ArrayPool<T>`나 `Allocator.Persistent`를 쓴다.
 
 ## 19. UI 렌더링 및 캔버스 최적화 (Overdraw & Rebuild 방지)
 
@@ -300,7 +312,7 @@ UI(UGUI)는 CPU의 메시 재생성(Rebuild)과 GPU의 픽셀 덮어쓰기(Overd
   - 매 프레임 또는 자주 갱신되는 UI(체력 바, 타이머, 미니맵 아이콘 등)는 별도의 하위 `Canvas` 컴포넌트를 붙여 정적인 배경/프레임 UI와 메시 재생성 영역을 분리한다.
 - **투명 패널 오버드로우 방지**:
   - 단순 레이아웃 정렬이나 클릭 차단용으로 투명한 패널을 만들 때, 알파가 0인 `Image` 컴포넌트를 화면 전체에 깔아두지 않는다. 화면에 보이지 않아도 GPU는 해당 영역의 픽셀 셰이더를 전부 실행(오버드로우)한다.
-  - 레이아웃 정렬에는 컴포넌트 없는 빈 `RectTransform`을 사용하고, 광선 차단이 목적이면 `CanvasRenderer`를 사용하지 않는 커스텀 빈 그래픽 컴포넌트를 활용한다.
+  - 레이아웃 정렬에는 컴포넌트 없는 빈 `RectTransform`을 사용하고, 광선 차단이 목적이면 `Graphic`을 상속해 `OnPopulateMesh(VertexHelper vh)`에서 `vh.Clear()`만 호출하는 빈 그래픽 컴포넌트를 쓴다. 정점을 하나도 내보내지 않으므로 레이캐스트는 받으면서 그리는 픽셀은 없다. (`Graphic`에는 `[RequireComponent(typeof(CanvasRenderer))]`가 붙어 있어 CanvasRenderer 자체를 떼어낼 수는 없다 — 떼는 게 아니라 그릴 메시를 비우는 것이 핵심이다.)
 - **UI 스프라이트 Mipmap 비활성화**:
   - UGUI/HUD에 사용되는 모든 2D 스프라이트 및 UI 텍스처는 인스펙터 Import Settings에서 `Generate Mip Maps`를 반드시 끈다.
   - UI는 카메라와의 거리가 일정하여 밉맵 축소본을 참조할 일이 없으므로, 켜둘 경우 33%의 불필요한 VRAM 낭비 및 특정 해상도에서 UI 텍스트나 아이콘이 뿌옇게 흐려지는(Blur) 현상이 발생한다.
@@ -311,9 +323,9 @@ UI(UGUI)는 CPU의 메시 재생성(Rebuild)과 GPU의 픽셀 덮어쓰기(Overd
 
 - **직접 일치 비교(`==`, `!=`) 금지**: `float` 변수를 `0f`나 특정 목표값과 직접 `==`로 비교하면 영원히 참이 되지 않아 타이머 멈춤, 무한 루프, 이동 상태 전이 실패 등의 버그가 발생한다.
 - **권장 비교 방식**:
-  - 단순 일치 비교: `Mathf.Approximately(a, b)` 사용.
+  - 0f 또는 목표값 도달 검사: `Mathf.Abs(v) < 0.001f`, `Vector3.Distance(current, target) < 0.01f`처럼 **명시적 오차 허용치(Epsilon)**를 둔다.
   - 타이머/게이지 카운트다운: 등호 대신 부등호 사용 (`currentTimer <= 0f`).
-  - 좌표/거리 도달 검사: `Vector3.Distance(current, target) < 0.01f` 또는 `Mathf.Abs(a - b) < 0.001f`처럼 명시적 오차 허용치(Epsilon)를 둔다.
+  - `Mathf.Approximately(a, b)`는 **`0f`와의 비교에 쓰지 않는다.** 이 함수는 `Abs(b - a) < Max(1E-06f * Max(Abs(a), Abs(b)), Epsilon * 8)`인 상대 오차 방식이라 한쪽이 `0f`면 허용치가 같이 0으로 붕괴해 사실상 `==`와 똑같이 동작한다(`Mathf.Approximately(1e-8f, 0f)`는 `false`). 0이 아닌 두 값의 크기가 비슷할 때만 쓴다.
 
 ## 21. 셰이더 및 GPU 연산 최적화 (HLSL / ShaderGraph)
 
@@ -338,30 +350,27 @@ GPU는 32개(또는 64개)의 스레드가 한 묶음으로 동일한 명령어�
 캐릭터 제어, 몬스터/NPC AI, 또는 전시 체험 시퀀스(대기 → 인식 → 체험 → 결과)를 구현할 때 거대한 `if-else`/`switch` 플래그 스파게티를 지양하고 전용 패턴을 채택한다.
 
 - **상태 패턴 (State Pattern / FSM)**:
-  - 복합적인 행동과 상태 전이가 필요한 객체는 `IState` 인터페이스(`Enter()`, `Update()`, `Exit()`)를 따르는 독립된 클래스로 쪼개어 관리한다.
-  - `Player.cs` 등의 주체는 직접 행동을 판별하지 않고, 현재 상태 객체의 생명주기 메서드만 위임 호출한다.
-  - **Zero-GC 준수**: 상태를 바꿀 때마다 `new JumpState()`처럼 힙 할당을 발생시키지 않는다. 객체 초기화(`Awake`/`Start`) 시 사용될 상태 인스턴스들을 미리 생성해두고, 전환 시에는 캐싱된 인스턴스의 참조만 교체한다:
+  - **FSM은 직접 구현하지 않는다.** `HuliacDev.Core`의 `IState<TContext>` / `StateMachine<TContext>`(주체를 인자로 받는 형태)와 컨텍스트가 필요 없을 때 쓰는 `IState` / `StateMachine`을 그대로 쓴다 (1번 재사용 원칙). 프로젝트마다 `IState`를 새로 선언하면 같은 걸 매번 다시 만들게 된다.
+  - 이 스택에서 FSM이 지켜야 하는 계약은 다음과 같다. 템플릿 구현은 이 계약을 만족해야 하고, 만족하지 않으면 템플릿을 고친다.
+    - 상태는 `Enter` / `Update` / `Exit` 세 생명주기를 갖고, 주체(`Player.cs` 등)는 직접 행동을 판별하지 않고 현재 상태 객체에 위임만 한다.
+    - **동일 상태로의 재진입은 무시한다.** 막지 않으면 `Exit` → `Enter`가 같은 인스턴스에 연속으로 불려 진입 연출이나 타이머가 매 호출마다 초기화된다.
+    - **Zero-GC 준수**: 상태를 바꿀 때마다 `new JumpState()`처럼 힙 할당을 발생시키지 않는다. 초기화(`Awake`/`Start`) 시 상태 인스턴스를 미리 만들어 두고 전환 시에는 참조만 교체한다.
+    - **상태 변화를 외부에서 관찰해야 하면 R3로 노출한다**(5번). 순수 C# `event`는 쓰지 않는다 — 구독 해제 규약이 R3/MessagePipe와 달라져 해제 누락이 섞인다.
+  - 상태를 컨텍스트 인자로 받게 하면 상태 객체가 주체를 필드로 들고 있을 필요가 없어, 인스턴스를 여러 주체가 공유하거나 `static`으로 둘 수 있다:
     ```csharp
-    public interface IState
+    private StateMachine<PlayerController> _stateMachine;
+    private readonly IdleState _idleState = new IdleState();
+    private readonly JumpState _jumpState = new JumpState();
+
+    private void Awake()
     {
-        void Enter();
-        void Update();
-        void Exit();
+        _stateMachine = new StateMachine<PlayerController>(this, _idleState);
     }
 
-    public class StateMachine
-    {
-        public IState CurrentState { get; private set; }
+    private void Update() => _stateMachine.Update();
 
-        public void ChangeState(IState newState)
-        {
-            CurrentState?.Exit();
-            CurrentState = newState;
-            CurrentState?.Enter();
-        }
-
-        public void Update() => CurrentState?.Update();
-    }
+    // 전환은 미리 만들어 둔 인스턴스의 참조 교체로만 일어난다.
+    private void OnJumpInput() => _stateMachine.ChangeState(_jumpState);
     ```
 
 - **명령 패턴 (Command Pattern)**:
