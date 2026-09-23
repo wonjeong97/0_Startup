@@ -85,11 +85,9 @@ description: Unity networking and packet synchronization guidelines — transpor
 
 ## 4. 멀티스레드 소켓 I/O와 Unity 메인 스레드 동기화
 
-소켓 읽기(`Socket.ReceiveAsync`, `UdpClient.ReceiveAsync`)는 절대 메인 스레드를 블로킹해서는 안 되며, 수신된 데이터는 스레드 안전하게 Unity 월드로 전달되어야 한다.
+소켓 읽기(`Socket.ReceiveAsync`, `UdpClient.ReceiveAsync`)는 절대 메인 스레드를 블로킹해서는 안 되며, 수신된 데이터는 스레드 안전하게 Unity 월드로 전달되어야 한다. 백그라운드→메인 스레드 복귀의 일반 원칙(`UniTask.SwitchToMainThread`, volatile/Interlocked 공유 상태)은 unity-stack-scaffold 스킬 15번을 따른다 — 여기서는 소켓 수신 루프에 특화된 패턴만 다룬다.
 
-- **원칙**:
-  1. 패킷 수신 및 역직렬화는 백그라운드 워커 스레드(`UniTask.RunOnThreadPool` 또는 비동기 태스크)에서 수행한다.
-  2. 역직렬화가 끝난 이벤트/데이터는 `MessagePipe`를 통해 발행하거나, `await UniTask.SwitchToMainThread()`를 호출하여 메인 스레드로 안전하게 진입한 뒤 게임 로직을 갱신한다:
+- 패킷 수신 및 역직렬화는 백그라운드 워커 스레드(`UniTask.RunOnThreadPool` 또는 비동기 태스크)에서 수행하고, 역직렬화가 끝난 이벤트/데이터는 `MessagePipe`를 통해 발행하거나 `UniTask.SwitchToMainThread()`로 복귀한 뒤 게임 로직을 갱신한다:
   ```csharp
   private async UniTaskVoid StartReceiveLoopAsync(CancellationToken ct)
   {
