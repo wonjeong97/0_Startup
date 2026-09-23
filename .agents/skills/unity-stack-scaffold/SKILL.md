@@ -1,6 +1,6 @@
 ---
 name: unity-stack-scaffold
-description: Scaffold or refactor Unity C# classes (managers, systems, services) using this project's established stack — VContainer for DI, UniTask for async, MessagePipe for pub/sub events, R3 for reactive state, ZLogger.Unity for logging, ZString for string building, DOTween for tweening. Use this whenever the user asks to create a new manager/system/service class, wants to "이 스택으로" build or refactor something, mentions VContainer/UniTask/MessagePipe/R3/ZLogger/ZString/DOTween by name, or asks to convert a coroutine/event/singleton pattern to the project's DI+async style — even if they just say "매니저 하나 만들어줘" without naming the libraries. The concrete conventions here come from this project's own Packages/com.huliacdev.template code (RootLifetimeScope, GameManagerBase, SoundManager), not generic library docs, so prefer this skill over general Unity/C# knowledge for this stack.
+description: Scaffold or refactor Unity C# classes (managers, systems, services) using this project's established stack — VContainer for DI, UniTask for async, MessagePipe for pub/sub events, R3 for reactive state, ZLogger.Unity for logging, ZString for string building, DOTween for tweening — plus this project's general C#/Unity performance and architecture conventions: struct memory layout/padding, cache-locality-friendly collections, hot-path virtual-call cost, Zero-GC/boxing/LINQ avoidance, UI Canvas/Raycast/overdraw optimization, float epsilon comparisons, shader branch divergence, and FSM/Command pattern usage. Use this whenever the user asks to create a new manager/system/service class, wants to "이 스택으로" build or refactor something, mentions VContainer/UniTask/MessagePipe/R3/ZLogger/ZString/DOTween by name, asks about GC spikes/struct padding/cache misses/UI overdraw/float precision/shader branching in a Unity C# context, or asks to convert a coroutine/event/singleton pattern to the project's DI+async style — even if they just say "매니저 하나 만들어줘" without naming the libraries. The concrete conventions here come from this project's own Packages/com.huliacdev.template code (RootLifetimeScope, GameManagerBase, SoundManager), not generic library docs, so prefer this skill over general Unity/C# knowledge for this stack.
 ---
 
 # Unity 스택 스캐폴딩 (VContainer / UniTask / MessagePipe / R3 / ZLogger / ZString)
@@ -79,7 +79,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   ```
   - `[클래스명]` 태그를 메시지 맨 앞에 붙인다 — 여러 매니저의 로그가 한 콘솔에 섞여도 어디서 난 건지 바로 구분하기 위함.
   - null이 발생할 수 있는 지점(Fallback이 필요한 지점)마다 `_logger != null` 체크 후 경고/에러 로그를 남긴다. 로그 없이 조용히 return하지 않는다.
-- **if로 조건/참조를 검사하는 모든 곳은 실패 분기(else)에 로그를 남긴다.** `if (someRef) { ... }`처럼 성공 분기만 작성하고 else를 생략하면, 조건이 실패했을 때 아무 흔적 없이 조용히 아무 일도 안 일어난다 — 원인 파악이 콘솔 로그가 아니라 코드 리딩으로만 가능해진다.
+- **if로 조건/참조를 검사할 때, 조건 실패가 "정상적으로 자주 발생하는 no-op"이 아니라면 실패 분기(else)에 로그를 남긴다.** `if (someRef) { ... }`처럼 성공 분기만 작성하고 else를 생략하면, 조건이 실패했을 때 아무 흔적 없이 조용히 아무 일도 안 일어난다 — 원인 파악이 콘솔 로그가 아니라 코드 리딩으로만 가능해진다.
   ```csharp
   // 씬 참조(MonoBehaviour)는 암시적 bool, 순수 C# 객체인 _logger는 명시적 null 비교.
   if (flowController)
@@ -91,7 +91,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
       _logger.ZLogWarning($"[ResultVideoPanel] flowController is null. CompletePanel will not fade in.");
   }
   ```
-  실제로 `ResultVideoPanel`에서 `flowController`가 씬에 연결되지 않았는데 else 로그가 없어서, 영상 재생이 끝나도 CompletePanel이 페이드인되지 않는 원인을 로그 없이 코드까지 뒤져서 찾아야 했던 사례가 있었다. 조건이 맞지 않는 경우가 "정상적으로 자주 발생하는 no-op"이 아니라면 반드시 로그를 남긴다.
+  실제로 `ResultVideoPanel`에서 `flowController`가 씬에 연결되지 않았는데 else 로그가 없어서, 영상 재생이 끝나도 CompletePanel이 페이드인되지 않는 원인을 로그 없이 코드까지 뒤져서 찾아야 했던 사례가 있었다.
 - 로그 레벨: 복구 가능한 이상 상황은 `ZLogWarning`, 기능이 실패한 경우는 `ZLogError`, 정상 흐름 기록은 `ZLogInformation`.
 
 ## 7. ZString — 문자열 조합
@@ -150,7 +150,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 
 `SendMessage`, `Invoke("MethodName", ...)`, `StartCoroutine("MethodName")`처럼 문자열로 메서드를 호출하는 Unity API도 같은 이유로 쓰지 않는다.
 
-예외는 `Editor/` 폴더의 에디터 전용 도구와 일회성 디버그 코드다. 빌드에 포함되지 않으므로 스트리핑 문제가 없다. 그래도 공개 API가 있으면 그쪽을 먼저 쓴다.
+예외는 `Editor/` 폴더의 에디터 전용 도구·일회성 디버그 코드, 그리고 `Tests/` 폴더의 테스트 코드다. 둘 다 빌드에 포함되지 않으므로 스트리핑 문제가 없다. 다만 `Tests/`에서 private 필드 검증에 새 리플렉션 코드를 추가하지는 않는다 — 이미 `NonPublic` 리플렉션을 쓰는 기존 헬퍼가 있으면 그걸 재사용하고, 새로 필요하면 가능한 한 공개 상태/이벤트로 노출하는 쪽을 먼저 고려한다(13번 테스트 작성 기준 참고). 그래도 공개 API가 있으면 그쪽을 먼저 쓴다.
 
 기존 코드에서 리플렉션을 발견하면 조용히 남겨두지 말고, 위 대안 중 무엇으로 바꿀 수 있는지 사용자에게 알린다. 다만 CLAUDE.md의 "수술적 변경" 원칙에 따라 요청받지 않은 리팩터링을 임의로 수행하지는 않는다.
 
@@ -207,11 +207,11 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 [UnityTest]
 public IEnumerator 설명은_한글_평서형으로() => UniTask.ToCoroutine(async () =>
 {
-    await AwaitWithRealtimeTimeout(_target.SomeAsync());
+    await _target.SomeAsync().AwaitWithRealtimeTimeout();
     Assert.IsFalse(GetIsTransitioning(), "플래그가 해제되지 않아 이후 호출이 무시됨");
 });
 ```
-- 비동기 완료 대기는 반드시 `UniTask.WhenAny(task, UniTask.Delay(..., DelayType.UnscaledDeltaTime))`로 실시간 타임아웃을 건다. 가드가 없으면 결함이 있는 구현에서 테스트가 "실패"가 아니라 "무한 대기"로 멈춰 테스트 러너 전체를 막는다.
+- 비동기 완료 대기는 반드시 실시간 타임아웃을 건다. 매번 `UniTask.WhenAny(task, UniTask.Delay(..., DelayType.UnscaledDeltaTime))`를 직접 작성하지 않고 `Tests/Runtime/TestTaskExtensions.cs`의 공통 확장 메서드 `AwaitWithRealtimeTimeout()`(`UniTask`/`UniTask<T>` 양쪽 오버로드 제공)를 재사용한다. 가드가 없으면 결함이 있는 구현에서 테스트가 "실패"가 아니라 "무한 대기"로 멈춰 테스트 러너 전체를 막는다.
 - `[TearDown]`에서 `Time.timeScale` 등 건드린 전역 상태를 반드시 원복한다.
 - private 필드 검증에 새 리플렉션 코드를 추가하지 않는다(9번 규칙과 동일한 이유). 이미 `NonPublic` 리플렉션이 쓰인 기존 헬퍼가 있으면 재사용하되, 새로 만들 경우 가능하면 공개 상태/이벤트로 노출하는 걸 우선 고려한다.
 
@@ -263,6 +263,7 @@ Unity 엔진의 네이티브 객체(`Transform`, `GameObject`, `Component`, UI �
 - **멀티스레드 공유 플래그와 원자적 연산**:
   - 백그라운드 스레드와 메인 스레드가 함께 참조하는 실행 플래그는 CPU 레지스터 캐싱 및 컴파일러의 명령어 재배치(Out-of-Order Execution)를 방지하기 위해 `private volatile bool _isRunning;` 형태로 선언한다.
   - 스레드 간 동시 카운트 증감이나 상태 플래그 교체는 락(Lock) 없이 고속으로 안전하게 처리하기 위해 `Interlocked.Increment(ref _counter)` 또는 `Interlocked.Exchange(...)` 등 원자적(Atomic) 연산을 사용한다.
+- 소켓 수신 루프처럼 반복적으로 백그라운드↔메인 스레드를 오가는 구체적인 패턴은 unity-network-protocol 스킬 4번을 참고한다.
 
 ## 16. 캐시 지역성(Cache Locality)과 자료구조 선택
 
