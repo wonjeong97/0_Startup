@@ -1,6 +1,6 @@
 ---
 name: unity-stack-scaffold
-description: Scaffold or refactor Unity C# classes (managers, systems, services) using this project's established stack — VContainer for DI, UniTask for async, MessagePipe for pub/sub events, R3 for reactive state, ZLogger.Unity for logging, ZString for string building, DOTween for tweening. Use this whenever the user asks to create a new manager/system/service class, wants to "이 스택으로" build or refactor something, mentions VContainer/UniTask/MessagePipe/R3/ZLogger/ZString/DOTween by name, or asks to convert a coroutine/event/singleton pattern to the project's DI+async style — even if they just say "매니저 하나 만들어줘" without naming the libraries. The concrete conventions here come from this project's own Packages/com.huliacdev.template code (RootLifetimeScope, GameManagerBase, SoundManager), not generic library docs, so prefer this skill over general Unity/C# knowledge for this stack.
+description: Scaffold or refactor Unity C# classes (managers, systems, services) using this project's established stack — VContainer for DI, UniTask for async, MessagePipe for pub/sub events, R3 for reactive state, ZLogger.Unity for logging, ZString for string building, DOTween for tweening — plus this project's general C#/Unity performance and architecture conventions: struct memory layout/padding, cache-locality-friendly collections, hot-path virtual-call cost, Zero-GC/boxing/LINQ avoidance, UI Canvas/Raycast/overdraw optimization, float epsilon comparisons, shader branch divergence, and FSM/Command pattern usage. Use this whenever the user asks to create a new manager/system/service class, wants to "이 스택으로" build or refactor something, mentions VContainer/UniTask/MessagePipe/R3/ZLogger/ZString/DOTween by name, asks about GC spikes/struct padding/cache misses/UI overdraw/float precision/shader branching in a Unity C# context, or asks to convert a coroutine/event/singleton pattern to the project's DI+async style — even if they just say "매니저 하나 만들어줘" without naming the libraries. The concrete conventions here come from this project's own Packages/com.huliacdev.template code (RootLifetimeScope, GameManagerBase, SoundManager), not generic library docs, so prefer this skill over general Unity/C# knowledge for this stack.
 ---
 
 # Unity 스택 스캐폴딩 (VContainer / UniTask / MessagePipe / R3 / ZLogger / ZString)
@@ -79,7 +79,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   ```
   - `[클래스명]` 태그를 메시지 맨 앞에 붙인다 — 여러 매니저의 로그가 한 콘솔에 섞여도 어디서 난 건지 바로 구분하기 위함.
   - null이 발생할 수 있는 지점(Fallback이 필요한 지점)마다 `_logger != null` 체크 후 경고/에러 로그를 남긴다. 로그 없이 조용히 return하지 않는다.
-- **if로 조건/참조를 검사하는 모든 곳은 실패 분기(else)에 로그를 남긴다.** `if (someRef) { ... }`처럼 성공 분기만 작성하고 else를 생략하면, 조건이 실패했을 때 아무 흔적 없이 조용히 아무 일도 안 일어난다 — 원인 파악이 콘솔 로그가 아니라 코드 리딩으로만 가능해진다.
+- **if로 조건/참조를 검사할 때, 조건 실패가 "정상적으로 자주 발생하는 no-op"이 아니라면 실패 분기(else)에 로그를 남긴다.** `if (someRef) { ... }`처럼 성공 분기만 작성하고 else를 생략하면, 조건이 실패했을 때 아무 흔적 없이 조용히 아무 일도 안 일어난다 — 원인 파악이 콘솔 로그가 아니라 코드 리딩으로만 가능해진다.
   ```csharp
   // 씬 참조(MonoBehaviour)는 암시적 bool, 순수 C# 객체인 _logger는 명시적 null 비교.
   if (flowController)
@@ -91,7 +91,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
       _logger.ZLogWarning($"[ResultVideoPanel] flowController is null. CompletePanel will not fade in.");
   }
   ```
-  실제로 `ResultVideoPanel`에서 `flowController`가 씬에 연결되지 않았는데 else 로그가 없어서, 영상 재생이 끝나도 CompletePanel이 페이드인되지 않는 원인을 로그 없이 코드까지 뒤져서 찾아야 했던 사례가 있었다. 조건이 맞지 않는 경우가 "정상적으로 자주 발생하는 no-op"이 아니라면 반드시 로그를 남긴다.
+  실제로 `ResultVideoPanel`에서 `flowController`가 씬에 연결되지 않았는데 else 로그가 없어서, 영상 재생이 끝나도 CompletePanel이 페이드인되지 않는 원인을 로그 없이 코드까지 뒤져서 찾아야 했던 사례가 있었다.
 - 로그 레벨: 복구 가능한 이상 상황은 `ZLogWarning`, 기능이 실패한 경우는 `ZLogError`, 정상 흐름 기록은 `ZLogInformation`.
 
 ## 7. ZString — 문자열 조합
@@ -150,7 +150,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 
 `SendMessage`, `Invoke("MethodName", ...)`, `StartCoroutine("MethodName")`처럼 문자열로 메서드를 호출하는 Unity API도 같은 이유로 쓰지 않는다.
 
-예외는 `Editor/` 폴더의 에디터 전용 도구와 일회성 디버그 코드다. 빌드에 포함되지 않으므로 스트리핑 문제가 없다. 그래도 공개 API가 있으면 그쪽을 먼저 쓴다.
+예외는 `Editor/` 폴더의 에디터 전용 도구·일회성 디버그 코드, 그리고 `Tests/` 폴더의 테스트 코드다. 둘 다 빌드에 포함되지 않으므로 스트리핑 문제가 없다. 다만 `Tests/`에서 private 필드 검증에 새 리플렉션 코드를 추가하지는 않는다 — 이미 `NonPublic` 리플렉션을 쓰는 기존 헬퍼가 있으면 그걸 재사용하고, 새로 필요하면 가능한 한 공개 상태/이벤트로 노출하는 쪽을 먼저 고려한다(13번 테스트 작성 기준 참고). 그래도 공개 API가 있으면 그쪽을 먼저 쓴다.
 
 기존 코드에서 리플렉션을 발견하면 조용히 남겨두지 말고, 위 대안 중 무엇으로 바꿀 수 있는지 사용자에게 알린다. 다만 CLAUDE.md의 "수술적 변경" 원칙에 따라 요청받지 않은 리팩터링을 임의로 수행하지는 않는다.
 
@@ -186,7 +186,22 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
       public static class Files { public const string RfidMappings = "RfidMappings.json"; }
   }
   ```
-- 반대로 씬별로 조정 가능한 튜닝 값(페이드 시간, 타이핑 속도 등)은 그대로 SerializeField로 둔다. 중앙화 대상은 "정체성(식별자)"이지 "인스턴스별 조정 파라미터"가 아니다.
+- 값을 어디에 둘지는 자료형(string/int/float)이 아니라 "누가, 언제 바꾸는가"로 정한다. 숫자라도 마스터·슬레이브가 맞춰 쓰는 포트 번호는 `Constants`, 문자열이라도 스토리 문구는 ScriptableObject다:
+
+  | 값의 성격 | 둘 곳 | 예 |
+  |---|---|---|
+  | 코드끼리 맞춰 쓰는 식별자 (개발자가 코드와 함께 바꿈) | `Constants` (const) | 씬 이름, 파일 이름, API 경로, 패킷 접두어, 프로토콜 포트 |
+  | 한 컴포넌트에서만 쓰는 튜닝 값 | `[SerializeField]` 기본값 | 특정 패널의 페이드 시간, 타이핑 속도 |
+  | 여러 컴포넌트가 함께 쓰는 튜닝 값·콘텐츠 (에디터에서 조정) | ScriptableObject | 브러시 굵기 단계, 팔레트 색상, 연출 타이밍 세트, 스토리 문구 |
+  | 빌드 후 현장에서 바꿔야 하는 값 | StreamingAssets JSON (`Settings.json` 등) | 서버 IP/포트, 타임아웃, 자동 복귀 대기 시간 |
+
+- 한 컴포넌트에서만 쓰는 튜닝 값은 기본적으로 `[SerializeField]`로 두고, 아래 중 하나에 해당할 때만 ScriptableObject로 옮긴다. 처음부터 SO로 만들지 않는다 (에셋 생성·인스펙터 연결·null 처리 비용만 늘어난다):
+  - Play 모드에서 반복 조정해야 하는 값이 많다 (SerializeField는 Play 종료 시 되돌아가지만 SO는 에셋에 남는다).
+  - 값 묶음을 프리셋으로 통째로 교체해야 한다 (예: 전시별·연출 속도별 설정).
+  - 같은 컴포넌트가 여러 씬·프리팹에 배치되어 값을 한 번에 바꿔야 한다.
+  - 조정값이 많아 인스펙터에서 참조 필드와 섞여 관리가 어렵다.
+- 식별자를 ScriptableObject로 옮기지 않는다. 에셋에 직렬화된 값과 코드가 이원화되어 위의 씬 이름 사고가 똑같이 재발하고, 인스펙터 연결 누락이라는 null 실패 지점도 늘어난다.
+- ScriptableObject는 빌드 후 파일로 수정할 수 없고, 런타임에 바꾼 값은 빌드에서는 재시작 시 사라지며 에디터 Play 모드에서는 에셋에 그대로 저장되므로 런타임 상태 저장소로 쓰지 않는다.
 
 ## 13. 테스트 작성 기준 (UTF)
 
@@ -207,11 +222,11 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 [UnityTest]
 public IEnumerator 설명은_한글_평서형으로() => UniTask.ToCoroutine(async () =>
 {
-    await AwaitWithRealtimeTimeout(_target.SomeAsync());
+    await _target.SomeAsync().AwaitWithRealtimeTimeout();
     Assert.IsFalse(GetIsTransitioning(), "플래그가 해제되지 않아 이후 호출이 무시됨");
 });
 ```
-- 비동기 완료 대기는 반드시 `UniTask.WhenAny(task, UniTask.Delay(..., DelayType.UnscaledDeltaTime))`로 실시간 타임아웃을 건다. 가드가 없으면 결함이 있는 구현에서 테스트가 "실패"가 아니라 "무한 대기"로 멈춰 테스트 러너 전체를 막는다.
+- 비동기 완료 대기는 반드시 실시간 타임아웃을 건다. 매번 `UniTask.WhenAny(task, UniTask.Delay(..., DelayType.UnscaledDeltaTime))`를 직접 작성하지 않고 `Tests/Runtime/TestTaskExtensions.cs`의 공통 확장 메서드 `AwaitWithRealtimeTimeout()`(`UniTask`/`UniTask<T>` 양쪽 오버로드 제공)를 재사용한다. 가드가 없으면 결함이 있는 구현에서 테스트가 "실패"가 아니라 "무한 대기"로 멈춰 테스트 러너 전체를 막는다.
 - `[TearDown]`에서 `Time.timeScale` 등 건드린 전역 상태를 반드시 원복한다.
 - private 필드 검증에 새 리플렉션 코드를 추가하지 않는다(9번 규칙과 동일한 이유). 이미 `NonPublic` 리플렉션이 쓰인 기존 헬퍼가 있으면 재사용하되, 새로 만들 경우 가능하면 공개 상태/이벤트로 노출하는 걸 우선 고려한다.
 
@@ -263,6 +278,7 @@ Unity 엔진의 네이티브 객체(`Transform`, `GameObject`, `Component`, UI �
 - **멀티스레드 공유 플래그와 원자적 연산**:
   - 백그라운드 스레드와 메인 스레드가 함께 참조하는 실행 플래그는 CPU 레지스터 캐싱 및 컴파일러의 명령어 재배치(Out-of-Order Execution)를 방지하기 위해 `private volatile bool _isRunning;` 형태로 선언한다.
   - 스레드 간 동시 카운트 증감이나 상태 플래그 교체는 락(Lock) 없이 고속으로 안전하게 처리하기 위해 `Interlocked.Increment(ref _counter)` 또는 `Interlocked.Exchange(...)` 등 원자적(Atomic) 연산을 사용한다.
+- 소켓 수신 루프처럼 반복적으로 백그라운드↔메인 스레드를 오가는 구체적인 패턴은 unity-network-protocol 스킬 4번을 참고한다.
 
 ## 16. 캐시 지역성(Cache Locality)과 자료구조 선택
 
