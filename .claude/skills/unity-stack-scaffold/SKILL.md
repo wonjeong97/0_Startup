@@ -7,11 +7,15 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 
 이 스킬은 라이브러리 사용법을 처음부터 설계하는 게 아니라, 이 프로젝트의 `Packages/com.huliacdev.template` (RootLifetimeScope.cs, GameManagerBase.cs, SoundManager.cs)에 이미 정착된 실제 패턴을 재현하기 위한 것이다. 왜 이 방식인지 궁금하면 해당 파일들을 직접 열어 대조해도 된다.
 
+## 0. 공통 C# 규칙
+
 이 스킬은 "어떤 라이브러리를 어떤 순서/형태로 조합하는가"를 주로 다루지만, 아래 C# 작성 규칙은 이 스킬이 적용되는 모든 코드에 항상 함께 적용한다.
 
 - **`var` 금지**: 지역 변수도 `Task<Settings> loadTask = ...`처럼 타입을 명시한다. 템플릿 코드 전체가 이 규칙을 지키고 있으므로 `var`를 쓴 코드는 리뷰에서 되돌아온다.
 - **`GetComponent` 대신 `TryGetComponent`**: 실패 시 null이 조용히 전파되어 나중에 엉뚱한 곳에서 NRE가 나는 대신, bool 분기로 그 자리에서 처리한다.
-- **Unity 오브젝트의 null 검사는 암시적 bool**: `if (reporter)` / `if (!inspectorContainer)` 형태를 쓴다. 단 `ILogger`, `CancellationTokenSource` 같은 순수 C# 객체는 `if (_logger != null)`처럼 명시적 비교를 유지한다 — 암시적 bool은 `UnityEngine.Object`의 "파괴됨" 상태까지 잡아주는 연산자이지 일반 객체에는 없는 기능이다.
+- **`GetComponentInChildren` / `GetComponentInParent` 금지**: 계층 구조를 순회하며 처음 걸리는 컴포넌트를 반환하므로, 프리팹 구조가 바뀌면 조용히 다른 객체를 잡거나 null을 돌려준다(비활성 오브젝트는 기본적으로 건너뜀). `TryGetComponent` 같은 bool 버전도 없어 위 규칙과 충돌한다. 대신 `[SerializeField]`로 인스펙터에서 참조를 연결하거나 VContainer 주입을 쓴다.
+- **씬 탐색 API 금지**: `GameObject.Find`, `FindObjectOfType` / `FindFirstObjectByType` / `FindAnyObjectByType`, `Camera.main`을 쓰지 않는다. 위 규칙과 같은 이유로, 코드만 봐서는 무엇에 의존하는지 드러나지 않고 이름·태그·계층이 바뀌면 조용히 다른 객체를 잡거나 null을 돌려준다. 대안도 같다 — `[SerializeField]` 연결 또는 VContainer 주입.
+- **`UnityEngine.Object` 파생 타입의 null 검사는 암시적 bool**: `MonoBehaviour`뿐 아니라 `GameObject`, `ScriptableObject`, `Material`, `Texture` 등 `UnityEngine.Object`를 상속하는 모든 타입에 적용한다. `if (reporter)` / `if (!inspectorContainer)` 형태를 쓰고, `?.`, `??`, `??=`, `is null`, `is not null`은 쓰지 않는다. 이 문법들은 Unity가 재정의한 `==`를 거치지 않아 이미 파괴된 오브젝트를 null이 아니라고 판단한다. 단 `ILogger`, `CancellationTokenSource`, DOTween `Tween` 같은 순수 C# 객체는 `if (_logger != null)`처럼 명시적 비교를 쓰며, `_fadeCts?.Dispose()` 같은 단축 연산자도 허용한다.
 
 ## 1. HuliacDev 템플릿 우선 재사용
 
@@ -28,7 +32,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 ## 2. VContainer — DI 등록
 
 - 전역 등록은 `LifetimeScope.Configure(IContainerBuilder builder)`에서 하되, 관심사별로 `ConfigureLogging(builder)`, `ConfigureMessagePipe(builder)`처럼 **private/protected 메서드로 쪼갠다.** 하나의 Configure가 모든 걸 다 하지 않도록 하는 이유는, 나중에 로깅만 바꾸거나 파생 LifetimeScope에서 특정 부분만 override하기 쉽게 하기 위함이다.
-- 개별 컴포넌트는 생성자 주입이 아니라 **메서드 주입**을 쓴다:
+- **MonoBehaviour는 메서드 주입**을 쓴다:
   ```csharp
   [Inject]
   public void Construct(IPublisher<SomeEvent> publisher, ILogger<MyManager> logger)
@@ -38,6 +42,8 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   }
   ```
   MonoBehaviour는 생성자를 직접 호출할 수 없어서 이 패턴이 필요하다.
+- **순수 C# 클래스(서비스, 프로바이더 등)는 생성자 주입**을 쓴다. 의존성이 생성자 시그니처에 드러나고 `readonly` 필드로 받을 수 있어, 주입 누락이 런타임 null이 아니라 컨테이너 빌드 시점 오류로 드러난다.
+- **런타임에 생성하는 프리팹은 `IObjectResolver.Instantiate(prefab, parent)`로 만든다.** `Object.Instantiate`로 만든 오브젝트에는 `[Inject]`가 실행되지 않아 `_logger`, publisher 등이 null인 채로 동작한다. 오브젝트 풀(18번)도 풀을 채울 때 이 메서드로 생성한다. 이미 만들어진 오브젝트에 주입해야 하면 `IObjectResolver.InjectGameObject(go)`를 쓴다.
 
 ## 3. UniTask — 비동기 처리
 
@@ -51,12 +57,31 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   ```
   (참고: `GameManagerBase` 파생 클래스에서 세팅 완료 후 초기화가 필요한 경우, 직접 로드하기보다 `protected override void OnSettingsLoaded(Settings loadedSettings)`를 override하여 처리한다.)
 - 취소 토큰은 기본적으로 `this.GetCancellationTokenOnDestroy()`를 쓴다. 오브젝트가 파괴되면 자동으로 취소되어 별도 정리 코드가 필요 없다.
-- 사용자가 도중에 취소할 수 있는 흐름(페이드, 연출 등)은 별도 `CancellationTokenSource`를 만들어 관리한다:
+- 사용자가 도중에 취소할 수 있는 흐름(페이드, 연출 등)은 별도 `CancellationTokenSource`를 만들어 관리한다. 파괴 토큰과 링크하면 오브젝트 파괴 시 자동 취소와 수동 취소(`_fadeCts.Cancel()`) 둘 다 동작한다. `SoundManager.FadeOutBGM` / `FadeOutAsync`가 표준 형태다:
   ```csharp
-  _fadeCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
-  FadeOutAsync(duration, _fadeCts.Token).Forget();
+  public void StartFade(float duration)
+  {
+      CancelFade(); // 이전 흐름을 먼저 취소·해제한다
+      _fadeCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+      FadeAsync(duration, _fadeCts).Forget(); // 토큰이 아니라 CTS 객체를 넘긴다
+  }
+
+  private async UniTaskVoid FadeAsync(float duration, CancellationTokenSource cts)
+  {
+      try { await ...(cts.Token); }
+      catch (OperationCanceledException) { ... }
+      finally
+      {
+          // 필드가 아직 자기 CTS일 때만 정리한다
+          if (_fadeCts == cts)
+          {
+              _fadeCts.Dispose();
+              _fadeCts = null;
+          }
+      }
+  }
   ```
-  이렇게 링크하면 오브젝트 파괴 시 자동 취소와 수동 취소(`_fadeCts.Cancel()`) 둘 다 동작한다. `try { ... } catch (OperationCanceledException) { ... } finally { _fadeCts?.Dispose(); _fadeCts = null; }` 형태로 정리한다.
+  `finally`에서 무조건 `_fadeCts?.Dispose(); _fadeCts = null;`을 하면 안 된다. 페이드 A 진행 중 페이드 B가 시작되면, 취소된 A의 `finally`가 뒤늦게 실행되면서 B의 CTS를 폐기해 B가 취소 불가능한 상태가 되거나 `ObjectDisposedException`이 난다.
 - **다중 대기 태스크 캐싱은 `UniTask` 대신 `Task`를 사용한다**: `UniTask`는 구조체 기반이라 awaiter를 한 번만 등록할 수 있다. 특히 **로드가 아직 진행 중인 상태에서** 여러 소비자가 같은 `UniTask<T>`를 동시에 `await`하면 continuation이 중복 등록되어 `InvalidOperationException("Already continuation registered")`가 발생하며, `.Preserve()`로도 이 경우는 해결되지 않는다. 부팅 시 여러 매니저가 같은 리소스를 동시에 요청하는 상황이 정확히 여기 해당한다. 따라서 로더/다운로더/설정 제공자는 다중 awaiter를 기본 지원하는 `Task<T>`로 캐싱한다 — 키별 캐시는 `Dictionary<string, Task<T>>`(`SoundManager`의 `_activeDownloads`), 단일 리소스는 `Task<T>` 필드 하나(`AppSettingsProvider`의 `_loadTask`)가 그 패턴이다.
 
 ## 4. MessagePipe — 이벤트
@@ -92,6 +117,13 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   }
   ```
   실제로 `ResultVideoPanel`에서 `flowController`가 씬에 연결되지 않았는데 else 로그가 없어서, 영상 재생이 끝나도 CompletePanel이 페이드인되지 않는 원인을 로그 없이 코드까지 뒤져서 찾아야 했던 사례가 있었다.
+- **`UnityEngine.Debug.Log` 계열은 쓰지 않는다.** 모든 로그는 ZLogger를 거친다. 유일한 예외는 **DI 실패 자체를 알릴 때**다 — `_logger`가 주입되지 않았으면 위 패턴으로는 아무 흔적도 남지 않으므로, 템플릿(`GameManagerBase`, `InactivityTimer`, `ApiManagerBase`)처럼 `Debug.LogError`로 원인과 확인할 등록 코드를 남긴다:
+  ```csharp
+  if (_logger == null)
+  {
+      Debug.LogError("[MyManager] Dependencies were not injected. Check that RegisterComponentInHierarchy<MyManager>() is registered on the LifetimeScope.");
+  }
+  ```
 - 로그 레벨: 복구 가능한 이상 상황은 `ZLogWarning`, 기능이 실패한 경우는 `ZLogError`, 정상 흐름 기록은 `ZLogInformation`.
 
 ## 7. ZString — 문자열 조합
@@ -311,7 +343,8 @@ C#의 `virtual` 메서드나 인터페이스 호출은 런타임에 객체의 �
 - **LINQ 지양 (런타임 루프)**: `.Where()`, `.Select()`, `.ToList()`, `.OrderBy()` 등 `System.Linq` 메서드는 호출할 때마다 내부적으로 이터레이터 객체와 대리자(Delegate)를 힙에 새로 할당한다. 초기화/설정 로드가 아닌 런타임 반복 호출부(`Update`, 빈번한 이벤트 핸들러)에서는 LINQ 대신 단순 `for` 루프나 캐싱된 리스트를 사용한다.
 - **박싱(Boxing) 방지**:
   - 값 타입(`int`, `float`, `struct`, `enum`)을 `object`나 제약 없는 인터페이스 타입으로 전달하면 힙에 포장 객체가 생성된다.
-  - `enum`을 `Dictionary<TKey, TValue>`의 키로 사용할 때 기본 해시 연산에서 박싱이 일어날 수 있으므로 주의한다.
+  - `enum`을 `Dictionary<TKey, TValue>`의 키로 쓰는 것 자체는 막지 않는다. 핫패스에서 쓰는 딕셔너리가 프로파일러에 GC Alloc으로 잡히면 그때 전용 `IEqualityComparer<TEnum>`을 생성자에 넘긴다.
+- **컴포넌트 조회는 미리 찾아 필드에 저장한다**: `TryGetComponent`(0번)도 계층·컴포넌트 목록을 조회하는 호출이므로 `Update`나 빈번한 이벤트 핸들러에서 매번 부르지 않는다. `Awake`에서 한 번 찾아 필드에 저장하고, 가능하면 `[SerializeField]`로 연결해 조회 자체를 없앤다.
 - **람다 클로저(Closure) 주의**:
   - 람다식이나 이벤트 리스너 내부에서 바깥 스코프의 로컬 변수를 참조(캡처)하면, 컴파일러가 해당 변수를 담기 위한 임시 클래스 인스턴스를 힙에 매번 할당한다.
   - 반복 호출되는 콜백에는 외부 변수를 캡처하지 않는 정적 람다(`static (x) => ...`)를 쓰거나 상태를 매개변수로 명시적 전달한다.
@@ -349,8 +382,9 @@ UI(UGUI)는 CPU의 메시 재생성(Rebuild)과 GPU의 픽셀 덮어쓰기(Overd
 GPU는 32개(또는 64개)의 스레드가 한 묶음으로 동일한 명령어를 실행하는 SIMT(Single Instruction, Multiple Threads / Warp) 구조로 작동한다.
 
 - **분기 다이버전스(Branch Divergence) 방지**:
-  - 픽셀 셰이더(Fragment Shader) 내부에서 `if/else` 분기문을 사용하면, 워프 내에서 분기 결과가 갈릴 때 참인 스레드와 거짓인 스레드가 서로의 연산이 끝날 때까지 번갈아 유휴 대기(Idle)하므로 GPU 처리 속도가 급격히 저하된다.
-  - 셰이더 연산에서는 `if/else` 분기를 지양하고, `step()`, `lerp()`, `smoothstep()`, `saturate()` 등 GPU 하드웨어에 최적화된 내장 수학 함수를 활용하여 단일 수식으로 분기 없이 계산한다:
+  - 워프 안에서 분기 결과가 스레드마다 갈리면, 참인 스레드와 거짓인 스레드가 서로의 연산이 끝날 때까지 번갈아 유휴 대기(Idle)하므로 양쪽 분기 비용을 모두 치르게 된다.
+  - 모든 `if`가 문제인 것은 아니다. 머티리얼 속성·`uniform`처럼 **모든 픽셀에서 결과가 같은 분기는 다이버전스가 없고**, 아래 예시 같은 단순 대입 분기는 컴파일러가 알아서 분기 없는 선택 명령으로 바꾼다.
+  - 피해야 하는 건 **픽셀마다 결과가 달라지는 조건(UV, 텍스처 값, 월드 좌표 등) 아래에 무거운 연산(텍스처 샘플링, 반복문, 복잡한 수식)이 있는 분기**다. 이 경우 `step()`, `lerp()`, `smoothstep()`, `saturate()` 등 내장 수학 함수로 단일 수식을 만들어 분기 없이 계산한다:
     ```hlsl
     // 비권장 (분기 다이버전스 유발)
     float3 color;
