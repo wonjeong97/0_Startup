@@ -16,6 +16,9 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 - **`GetComponentInChildren` / `GetComponentInParent` 금지**: 계층 구조를 순회하며 처음 걸리는 컴포넌트를 반환하므로, 프리팹 구조가 바뀌면 조용히 다른 객체를 잡거나 null을 돌려준다(비활성 오브젝트는 기본적으로 건너뜀). `TryGetComponent` 같은 bool 버전도 없어 위 규칙과 충돌한다. 대신 `[SerializeField]`로 인스펙터에서 참조를 연결하거나 VContainer 주입을 쓴다.
   - 예외: 참조를 보관하지 않고 **존재 여부만 확인하는 DI 등록 코드**(`RootLifetimeScope.RegisterIfPresentInScene`처럼 씬 루트 아래 컴포넌트가 있는지 보고 등록 여부를 정하는 경우)는 허용한다. 등록 전이라 주입으로 대체할 수 없고, 결과를 필드에 들고 있지 않으므로 계층 변경이 조용한 오참조로 이어지지 않는다.
 - **씬 탐색 API 금지**: `GameObject.Find`, `FindObjectOfType` / `FindFirstObjectByType` / `FindAnyObjectByType`, `Camera.main`을 쓰지 않는다. 위 규칙과 같은 이유로, 코드만 봐서는 무엇에 의존하는지 드러나지 않고 이름·태그·계층이 바뀌면 조용히 다른 객체를 잡거나 null을 돌려준다. 대안도 같다 — `[SerializeField]` 연결 또는 VContainer 주입.
+  - `Transform.Find`(이름 기반 자식 탐색)도 같은 이유로 기본적으로 쓰지 않는다. 자식 이름은 인스펙터에서 언제든 바뀔 수 있고, 바뀌면 컴파일 오류 없이 null을 돌려준다.
+  - 예외: 코드가 직접 만들고 이름을 상수로 관리하는 자식을 다시 찾는 경우는 허용한다. `UIManager.SetButton`이 `ButtonTextChildName` 상수로 자기가 만든 `"Text"` 자식을 찾는 것이 그 예다. 이름을 정하는 쪽과 찾는 쪽이 같은 상수를 공유하므로 이름이 어긋날 수 없다.
+  - 이름을 모르는 기존 자식은 `foreach (Transform child in parent)`로 직계 자식을 순회하며 `TryGetComponent`로 찾는다. `UIManager`가 Unity 메뉴로 만든 `"Text (Legacy)"`·`"Text (TMP)"` 버튼의 텍스트를 재사용하는 방식이 이것이다.
 - **`UnityEngine.Object` 파생 타입의 null 검사는 암시적 bool**: `MonoBehaviour`뿐 아니라 `GameObject`, `ScriptableObject`, `Material`, `Texture` 등 `UnityEngine.Object`를 상속하는 모든 타입에 적용한다. `if (reporter)` / `if (!inspectorContainer)` 형태를 쓰고, `?.`, `??`, `??=`, `is null`, `is not null`은 쓰지 않는다. 이 문법들은 Unity가 재정의한 `==`를 거치지 않아 이미 파괴된 오브젝트를 null이 아니라고 판단한다. 단 `ILogger`, `CancellationTokenSource`, DOTween `Tween` 같은 순수 C# 객체는 `if (_logger != null)`처럼 명시적 비교를 쓰며, `_fadeCts?.Dispose()` 같은 단축 연산자도 허용한다.
 
 ## 1. HuliacDev 템플릿 우선 재사용
