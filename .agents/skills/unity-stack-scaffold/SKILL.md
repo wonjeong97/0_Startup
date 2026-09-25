@@ -14,6 +14,7 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
 - **`var` 금지**: 지역 변수도 `Task<Settings> loadTask = ...`처럼 타입을 명시한다. 템플릿 코드 전체가 이 규칙을 지키고 있으므로 `var`를 쓴 코드는 리뷰에서 되돌아온다.
 - **`GetComponent` 대신 `TryGetComponent`**: 실패 시 null이 조용히 전파되어 나중에 엉뚱한 곳에서 NRE가 나는 대신, bool 분기로 그 자리에서 처리한다.
 - **`GetComponentInChildren` / `GetComponentInParent` 금지**: 계층 구조를 순회하며 처음 걸리는 컴포넌트를 반환하므로, 프리팹 구조가 바뀌면 조용히 다른 객체를 잡거나 null을 돌려준다(비활성 오브젝트는 기본적으로 건너뜀). `TryGetComponent` 같은 bool 버전도 없어 위 규칙과 충돌한다. 대신 `[SerializeField]`로 인스펙터에서 참조를 연결하거나 VContainer 주입을 쓴다.
+  - 예외: 참조를 보관하지 않고 **존재 여부만 확인하는 DI 등록 코드**(`RootLifetimeScope.RegisterIfPresentInScene`처럼 씬 루트 아래 컴포넌트가 있는지 보고 등록 여부를 정하는 경우)는 허용한다. 등록 전이라 주입으로 대체할 수 없고, 결과를 필드에 들고 있지 않으므로 계층 변경이 조용한 오참조로 이어지지 않는다.
 - **씬 탐색 API 금지**: `GameObject.Find`, `FindObjectOfType` / `FindFirstObjectByType` / `FindAnyObjectByType`, `Camera.main`을 쓰지 않는다. 위 규칙과 같은 이유로, 코드만 봐서는 무엇에 의존하는지 드러나지 않고 이름·태그·계층이 바뀌면 조용히 다른 객체를 잡거나 null을 돌려준다. 대안도 같다 — `[SerializeField]` 연결 또는 VContainer 주입.
 - **`UnityEngine.Object` 파생 타입의 null 검사는 암시적 bool**: `MonoBehaviour`뿐 아니라 `GameObject`, `ScriptableObject`, `Material`, `Texture` 등 `UnityEngine.Object`를 상속하는 모든 타입에 적용한다. `if (reporter)` / `if (!inspectorContainer)` 형태를 쓰고, `?.`, `??`, `??=`, `is null`, `is not null`은 쓰지 않는다. 이 문법들은 Unity가 재정의한 `==`를 거치지 않아 이미 파괴된 오브젝트를 null이 아니라고 판단한다. 단 `ILogger`, `CancellationTokenSource`, DOTween `Tween` 같은 순수 C# 객체는 `if (_logger != null)`처럼 명시적 비교를 쓰며, `_fadeCts?.Dispose()` 같은 단축 연산자도 허용한다.
 
@@ -117,7 +118,10 @@ description: Scaffold or refactor Unity C# classes (managers, systems, services)
   }
   ```
   실제로 `ResultVideoPanel`에서 `flowController`가 씬에 연결되지 않았는데 else 로그가 없어서, 영상 재생이 끝나도 CompletePanel이 페이드인되지 않는 원인을 로그 없이 코드까지 뒤져서 찾아야 했던 사례가 있었다.
-- **`UnityEngine.Debug.Log` 계열은 쓰지 않는다.** 모든 로그는 ZLogger를 거친다. 유일한 예외는 **DI 실패 자체를 알릴 때**다 — `_logger`가 주입되지 않았으면 위 패턴으로는 아무 흔적도 남지 않으므로, 템플릿(`GameManagerBase`, `InactivityTimer`, `ApiManagerBase`)처럼 `Debug.LogError`로 원인과 확인할 등록 코드를 남긴다:
+- **`UnityEngine.Debug.Log` 계열은 쓰지 않는다.** 모든 로그는 ZLogger를 거친다. 예외는 아래 세 경우뿐이다.
+  - **`Editor/` 폴더의 에디터 전용 코드**: ZLogger DI 컨테이너가 없는 환경이다.
+  - **로거를 받을 수 없거나 받지 못했을 때의 대체 출력**: 정적 유틸리티나 로거를 선택 인자로 받는 클래스는 `ILogger`를 인자로 받아 있으면 ZLogger로, 없으면 `Debug.Log`로 남긴다(`JsonLoader`, `LogRetentionService` 패턴). 로거 없이 조용히 넘어가지 않는 것이 핵심이다.
+  - **DI 실패 자체를 알릴 때**: `_logger`가 주입되지 않았으면 위 패턴으로는 아무 흔적도 남지 않으므로, 템플릿(`GameManagerBase`, `InactivityTimer`, `ApiManagerBase`)처럼 `Debug.LogError`로 원인과 확인할 등록 코드를 남긴다:
   ```csharp
   if (_logger == null)
   {
