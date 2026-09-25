@@ -1,6 +1,6 @@
 ---
 name: unity-stack-scaffold
-description: Scaffold or refactor Unity C# classes (managers, systems, services) using this project's established stack — VContainer for DI, UniTask for async, MessagePipe for pub/sub events, R3 for reactive state, ZLogger.Unity for logging, ZString for string building, DOTween for tweening — plus this project's general C#/Unity performance and architecture conventions: struct memory layout/padding, cache-locality-friendly collections, hot-path virtual-call cost, Zero-GC/boxing/LINQ avoidance, UI Canvas/Raycast/overdraw optimization, float epsilon comparisons, shader branch divergence, and FSM/Command pattern usage. Use this whenever the user asks to create a new manager/system/service class, wants to "이 스택으로" build or refactor something, mentions VContainer/UniTask/MessagePipe/R3/ZLogger/ZString/DOTween by name, asks about GC spikes/struct padding/cache misses/UI overdraw/float precision/shader branching in a Unity C# context, or asks to convert a coroutine/event/singleton pattern to the project's DI+async style — even if they just say "매니저 하나 만들어줘" without naming the libraries. The concrete conventions here come from this project's own Packages/com.huliacdev.template code (RootLifetimeScope, GameManagerBase, SoundManager), not generic library docs, so prefer this skill over general Unity/C# knowledge for this stack.
+description: Scaffold or refactor Unity C# classes (managers, systems, services) using this project's established stack — VContainer for DI, UniTask for async, MessagePipe for pub/sub events, R3 for reactive state, ZLogger.Unity for logging, ZString for string building, DOTween for tweening — plus this project's general C#/Unity performance and architecture conventions: struct memory layout/padding, cache-locality-friendly collections, hot-path virtual-call cost, Zero-GC/boxing/LINQ avoidance, UI Canvas/Raycast/overdraw optimization, float epsilon comparisons, shader branch divergence, FSM/Command pattern usage, and ProfilerMarker instrumentation of hot or frame-blocking sections. Use this whenever the user asks to create a new manager/system/service class, wants to "이 스택으로" build or refactor something, mentions VContainer/UniTask/MessagePipe/R3/ZLogger/ZString/DOTween by name, asks about GC spikes/struct padding/cache misses/UI overdraw/float precision/shader branching in a Unity C# context, or asks to convert a coroutine/event/singleton pattern to the project's DI+async style — even if they just say "매니저 하나 만들어줘" without naming the libraries. The concrete conventions here come from this project's own Packages/com.huliacdev.template code (RootLifetimeScope, GameManagerBase, SoundManager), not generic library docs, so prefer this skill over general Unity/C# knowledge for this stack.
 ---
 
 # Unity 스택 스캐폴딩 (VContainer / UniTask / MessagePipe / R3 / ZLogger / ZString)
@@ -437,6 +437,33 @@ GPU는 32개(또는 64개)의 스레드가 한 묶음으로 동일한 명령어�
     - **입력 버퍼링 (선입력)**: 모션/딜레이 중 입력된 커맨드를 `Queue<ICommand>`에 보관했다가 행동 가능 시점에 즉시 실행하여 씹힘 없는 조작감 구현.
     - **실행 취소 (Undo / Redo)**: 퍼즐, 에디터 도구, 턴제 시스템에서 행동 히스토리를 `Stack<ICommand>`에 저장하여 되돌리기 지원.
     - **네트워크 동기화 & 리플레이**: 전체 좌표 전송 대신 발생한 커맨드 목록만 직렬화하여 전송함으로써 대역폭 최소화 및 리플레이 재현.
+
+## 23. 프로파일링 계측 (ProfilerMarker)
+
+기본 Profiler는 Deep Profile을 켜지 않으면 `Update` 단위까지만 보여 주고, Deep Profile은 부하가 커서 수치가 왜곡된다. 무거운 구간에 이름 붙은 마커를 심어 두면 Deep Profile 없이도 Profiler Hierarchy와 Profile Analyzer에서 그 구간이 따로 보이고, 에이전트도 Unity MCP에서 `ProfilerRecorder`로 마커 이름을 지정해 시간을 읽을 수 있다.
+
+이 스킬로 아래 조건에 해당하는 코드를 작성할 때 마커를 같이 넣는다. 조건에 해당하지 않는 코드에는 넣지 않는다 — 모든 메서드에 마커를 강제하지 않는다(13번 테스트 기준과 같은 방식).
+
+- **마커를 넣는 구간**:
+  - 매 프레임 도는 핵심 루프 (17번 핫패스, 대량 엔티티·센서 데이터 처리, 16번 공간 분할 검사)
+  - 수신 패킷 디스패치처럼 입력량에 따라 호출 빈도가 달라지는 처리
+  - 한 번이지만 프레임을 멈출 수 있는 동기 작업 (대용량 데이터 파싱, 오브젝트 풀 채우기, 씬 진입 직후 초기화)
+- **형태**: `static readonly` 필드로 한 번만 만들고 `Auto()` 스코프로 감싼다. 마커 이름은 `클래스명.메서드명`으로 짓는다 — 6번 로그 태그와 같은 이유로, 여러 시스템의 샘플이 섞여도 출처가 바로 드러난다.
+  ```csharp
+  using Unity.Profiling;
+
+  private static readonly ProfilerMarker UpdateEntitiesMarker = new ProfilerMarker("MyManager.UpdateEntities");
+
+  private void Update()
+  {
+      using (UpdateEntitiesMarker.Auto())
+      {
+          UpdateEntities();
+      }
+  }
+  ```
+  `ProfilerMarker`와 `Auto()` 스코프는 구조체라 힙 할당이 없어 18번 Zero-GC 규칙과 충돌하지 않고, 프로파일러가 빠진 릴리스 빌드에서는 비용이 사실상 없으므로 배포 코드에 남겨 둔다.
+- **`await`를 마커 스코프 안에 넣지 않는다**: 마커의 시작과 끝은 같은 스레드, 같은 프레임 안에서 짝이 맞아야 한다. `using (...Auto())` 안에서 `await`하면 다른 프레임이나 스레드에서 끝이 기록되어 샘플이 어긋난다. 비동기 흐름은 `await` 사이의 동기 구간만 각각 감싼다.
 
 
 
