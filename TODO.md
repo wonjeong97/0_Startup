@@ -10,7 +10,7 @@
 
 ## 완료
 
-- [x] README를 현재 구조·패키지에 맞게 갱신 — 담당: Claude / 검증: Antigravity (완료: 2026-10-02)
-- [x] Test Framework를 프리릴리스(2.0.1-pre.18)에서 정식 버전으로 변경 — 담당: Claude / 검증: Antigravity (완료: 2026-10-02)
-- [x] 0_Idle 씬에서 효과 없는 Directional Light·Global Volume 제거 — 담당: Claude / 검증: Antigravity (완료: 2026-10-02)
-- [x] MCP용 Roslyn DLL을 Editor 전용으로 바꿔 플레이어 빌드에서 제외 — 담당: Claude / 검증: Antigravity (완료: 2026-10-02)
+- [x] README를 현재 구조·패키지에 맞게 갱신 — 담당: Claude / 검증: Claude(Antigravity 중단으로 대신 검증) (완료: 2026-10-02)
+- [x] Test Framework를 프리릴리스(2.0.1-pre.18)에서 정식 버전으로 변경 — 담당: Claude / 검증: Claude(Antigravity 중단으로 대신 검증) (완료: 2026-10-02)
+- [x] 0_Idle 씬에서 효과 없는 Directional Light·Global Volume 제거 — 담당: Claude / 검증: Claude(Antigravity 중단으로 대신 검증) (완료: 2026-10-02)
+- [x] MCP용 Roslyn DLL을 Editor 전용으로 바꿔 플레이어 빌드에서 제외 — 담당: Claude / 검증: Claude(Antigravity 중단으로 대신 검증) (완료: 2026-10-02)

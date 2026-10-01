@@ -64,8 +64,8 @@ UI·Fade·Sound·Video 매니저, ApiManagerBase, ArduinoManager, 로그 보관 
 - **렌더링:** UI 위주 성능 설정이 기본입니다. Quality·Graphics 기본값은 `URP-Performant` 이고 카메라 후처리는 꺼져 있습니다.
   3D를 쓰게 되면 High Fidelity와 카메라 후처리를 켭니다.
 - **Roslyn (MCP 전용):** `Assets/Plugins/Roslyn` 의 DLL은 MCP for Unity의 스크립트 검증·코드 실행에만 쓰이므로
-  Editor 전용으로 설정되어 있습니다. MCP 설정 창에서 Roslyn을 다시 설치하면 모든 플랫폼으로 돌아가므로,
-  Inspector에서 Editor만 체크해 플레이어 빌드에 들어가지 않게 합니다.
+  Editor 전용으로 설정되어 있습니다. 다시 설치해도 `.meta` 가 남아 있으면 설정이 유지되지만, 폴더를 지운 뒤
+  설치하면 모든 플랫폼으로 들어오므로 Inspector에서 Editor만 체크해 플레이어 빌드에 들어가지 않게 합니다.
 
 ## 패키지 업데이트
 
