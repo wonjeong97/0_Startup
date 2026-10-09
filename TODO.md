@@ -10,6 +10,8 @@
 
 ## 완료
 
+- [x] HuliacDev Template 패키지 26.10.9-1 → 26.10.10-1 업데이트(packages-lock.json 고정 커밋 640d05e → 36ec69a, 창 포커스 복구 WindowFocusRestorer·F 키 토글 추가, Reporter 메모리 누수 수정), Settings.json에 `focusRestoreDelay`·`focusRestoreRetryInterval`(3초) 추가, Player Settings Version 26.10.10 — 담당: Claude / 검증: Antigravity (완료: 2026-10-10)
+
 - [x] HuliacDev Template 패키지 26.9.25-3 → 26.10.9-1 업데이트(packages-lock.json 고정 커밋 b4547f3 → 640d05e, VideoManager 영상 RenderTexture 깊이 버퍼 제거 — 이 프로젝트는 해당 API를 쓰지 않음), Player Settings Version 26.10.9 — 담당: Claude / 검증: Claude(Antigravity 한도 초과로 대신 검증) (완료: 2026-10-09)
 - [x] MCP for Unity 패키지 10.2.0 → 10.3.0 업데이트(packages-lock.json 고정 커밋 갱신), Player Settings Version 26.10.4 — 담당: Claude / 검증: Antigravity (완료: 2026-10-04)
 - [x] README를 현재 구조·패키지에 맞게 갱신 — 담당: Claude / 검증: Claude(Antigravity 중단으로 대신 검증) (완료: 2026-10-02)

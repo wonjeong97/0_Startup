@@ -1,6 +1,17 @@
 # Changelog
 관람객·운영자 경험에 영향을 주는 변경 사항을 기록합니다. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를 따릅니다.
 
+## [2026-10-10]
+
+### ⚠ Breaking Changes
+- Windows 빌드에서 다른 창이 앞에 뜨면 3초 뒤 앱이 다시 앞으로 오므로, 유지보수 중 다른 프로그램을 쓰려면 앱에서 `F` 키를 눌러 이 기능을 꺼야 함(앱을 다시 켜면 켜진 상태로 돌아감).
+
+### Added
+- 알림·업데이트 창 등에 포커스를 빼앗겨도 앱 창을 다시 앞으로 가져와 키보드형 바코드·QR 스캐너 입력이 끊기지 않게 하고, 대기 시간과 재시도 간격을 설정 파일(`focusRestoreDelay`·`focusRestoreRetryInterval`, 기본 3초)로 조정할 수 있게 함.
+
+### Fixed
+- 로그 뷰어가 앱을 오래 켜 둘수록 메모리를 계속 늘리던 문제를 고침.
+
 ## [2026-09-25]
 
 ### ⚠ Breaking Changes
