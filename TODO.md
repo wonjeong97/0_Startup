@@ -10,6 +10,7 @@
 
 ## 완료
 
+- [x] 남은 서드파티 LFS 파일 28개(NuGet 아이콘, DOTween 에디터 이미지, TextMesh Pro 이미지·폰트·PDF)도 LFS에서 빼고, README에 Git 설치 필요 안내 추가 — `.gitattributes` 끝에 서드파티 폴더만 예외로 두어 프로젝트 자체 이미지·영상·폰트는 계속 LFS. `git archive` 결과물(ZIP과 같음)에 LFS 포인터 0개, Unity 배치 모드로 처음부터 열어 컴파일 에러 0 확인 — 담당: Claude / 검증: Antigravity (완료: 2026-10-13)
 - [x] DLL 126개를 Git LFS에서 빼서 일반 git 바이너리로 커밋(`.gitattributes` 의 `*.dll lfs` → `*.dll binary`, 내용은 LFS 원본과 SHA-256 동일) — GitHub "Download ZIP"으로 받으면 DLL이 LFS 포인터로 들어가 DOTween·R3·ZLogger 등 스크립트 에러가 나던 문제. 이전 커밋은 그대로 LFS — 담당: Claude / 검증: Antigravity (완료: 2026-10-13)
 - [x] HuliacDev Template 패키지 26.10.10-1 → 26.10.10-2 업데이트(packages-lock.json 고정 커밋 36ec69a → 8afd2a8, Settings.json을 읽지 못하면 비활동 복귀 90초 대체 설정, JsonLoader 취소 전달·원자적 저장, ConsecutiveClickCounter·ApiRetryUtil.GetTextWithRetryAsync 추가 — 이 프로젝트 코드는 바뀐 API를 쓰지 않음) — 담당: Claude / 검증: Antigravity (완료: 2026-10-10)
 - [x] HuliacDev Template 패키지 26.10.9-1 → 26.10.10-1 업데이트(packages-lock.json 고정 커밋 640d05e → 36ec69a, 창 포커스 복구 WindowFocusRestorer·F 키 토글 추가, Reporter 메모리 누수 수정), Settings.json에 `focusRestoreDelay`·`focusRestoreRetryInterval`(3초) 추가, Player Settings Version 26.10.10 — 담당: Claude / 검증: Antigravity (완료: 2026-10-10)

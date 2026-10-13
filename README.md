@@ -7,6 +7,7 @@
 
 - **Unity 2022.3.62f3 LTS**
 - **Render Pipeline:** Universal RP (URP) 14.0.12
+- **Git 필요:** HuliacDev Template·NuGetForUnity·MCP for Unity를 Git URL로 받으므로, ZIP으로 받았더라도 PC에 Git이 설치되어 있어야 합니다.
 
 ## 패키지 스택
 
