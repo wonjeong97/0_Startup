@@ -10,6 +10,7 @@
 
 ## 완료
 
+- [x] README 맨 앞에 clone·fork·ZIP 사용 방법을 넣고 전체를 간단하게 다시 씀. clone 후 새 저장소로 push하는 순서는 임시 폴더에서 직접 시험함(LFS hook이 있으면 예전 커밋의 LFS 파일이 없어 push가 막히므로 `lfs.allowincompletepush` 설정을 넣음) — 담당: Claude / 검증: Antigravity (완료: 2026-10-13)
 - [x] 남은 서드파티 LFS 파일 28개(NuGet 아이콘, DOTween 에디터 이미지, TextMesh Pro 이미지·폰트·PDF)도 LFS에서 빼고, README에 Git 설치 필요 안내 추가 — `.gitattributes` 끝에 서드파티 폴더만 예외로 두어 프로젝트 자체 이미지·영상·폰트는 계속 LFS. `git archive` 결과물(ZIP과 같음)에 LFS 포인터 0개, Unity 배치 모드로 처음부터 열어 컴파일 에러 0 확인 — 담당: Claude / 검증: Antigravity (완료: 2026-10-13)
 - [x] DLL 126개를 Git LFS에서 빼서 일반 git 바이너리로 커밋(`.gitattributes` 의 `*.dll lfs` → `*.dll binary`, 내용은 LFS 원본과 SHA-256 동일) — GitHub "Download ZIP"으로 받으면 DLL이 LFS 포인터로 들어가 DOTween·R3·ZLogger 등 스크립트 에러가 나던 문제. 이전 커밋은 그대로 LFS — 담당: Claude / 검증: Antigravity (완료: 2026-10-13)
 - [x] HuliacDev Template 패키지 26.10.10-1 → 26.10.10-2 업데이트(packages-lock.json 고정 커밋 36ec69a → 8afd2a8, Settings.json을 읽지 못하면 비활동 복귀 90초 대체 설정, JsonLoader 취소 전달·원자적 저장, ConsecutiveClickCounter·ApiRetryUtil.GetTextWithRetryAsync 추가 — 이 프로젝트 코드는 바뀐 API를 쓰지 않음) — 담당: Claude / 검증: Antigravity (완료: 2026-10-10)
