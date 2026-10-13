@@ -6,43 +6,40 @@
 ## 사용 방법
 
 **준비물:** Unity 2022.3.62f3, Git
-(일부 패키지를 Git 주소로 받으므로, 어떤 방법으로 받든 Git이 설치되어 있어야 합니다.)
+(일부 패키지를 Git 주소로 받으므로 Git이 설치되어 있어야 합니다.)
 
-### 1. Clone해서 새 프로젝트 만들기 (추천)
+템플릿은 **이 저장소만 추적하는 폴더를 하나 받아 두고, 새 프로젝트는 그 폴더에서 필요한 파일만 복사해 시작**하는 방식을 권장합니다.
+새 프로젝트는 템플릿의 git 기록 없이 깨끗하게 시작하고, 템플릿 폴더는 `git pull` 로 언제든 최신으로 맞출 수 있습니다.
 
-비공개 저장소로 만들 수 있고, 템플릿 하나로 프로젝트를 여러 개 만들 수 있습니다.
-
-1. GitHub에서 빈 저장소를 만듭니다(README 등 초기 파일 없이).
-2. 템플릿을 받아 그 저장소에 올립니다. `<내 계정>/MyProject` 는 1에서 만든 저장소로 바꿉니다.
-
-   ```bash
-   git clone https://github.com/wonjeong97/0_Startup.git MyProject
-   cd MyProject
-   git remote rename origin upstream
-   git remote add origin https://github.com/<내 계정>/MyProject.git
-   git config lfs.allowincompletepush true   # 예전 커밋의 LFS 파일은 올리지 않음(현재 파일에는 영향 없음)
-   git push -u origin main
-   ```
-
-3. Unity Hub에서 폴더를 엽니다. 처음 한 번은 패키지를 받느라 몇 분 걸립니다.
-
-템플릿이 업데이트되면 아래 명령으로 받습니다.
+### 1. 템플릿 폴더 준비 (처음 한 번)
 
 ```bash
-git pull upstream main
+git clone https://github.com/wonjeong97/0_Startup.git
 ```
 
-### 2. Fork해서 쓰기
+이 폴더에서는 작업하지 않습니다. 새 프로젝트를 시작하기 전에 `git pull` 로 최신 상태로 맞춥니다.
 
-GitHub에서 Fork한 뒤 내 fork를 clone합니다. 템플릿 업데이트는 내 fork 페이지의 **Sync fork** 버튼으로 받고 `git pull` 합니다.
-공개 저장소의 fork는 비공개로 바꿀 수 없고 한 계정에 하나만 만들 수 있으므로, 공개해도 되는 프로젝트 하나에만 알맞습니다.
+### 2. 새 프로젝트 시작
 
-### 3. ZIP으로 받기
+1. 템플릿 폴더에서 아래 6개만 새 프로젝트 폴더로 복사합니다. `Library`, `.git` 등 나머지는 복사하지 않습니다.
 
-GitHub의 **Code > Download ZIP** 은 둘러보기용입니다. git 기록이 없어서 템플릿 업데이트를 받을 수 없습니다.
+   | 복사할 것 | 내용 |
+   |-----------|------|
+   | `Assets/` | 스크립트, 프리팹, 씬, 런타임 설정 파일 |
+   | `Packages/` | 패키지 목록과 고정 버전 |
+   | `ProjectSettings/` | 프로젝트 설정 |
+   | `.gitignore` | git에서 뺄 파일 |
+   | `.gitattributes` | 큰 이미지·영상은 Git LFS로, DLL·서드파티 파일은 일반 파일로 저장하는 규칙 |
+   | `CLAUDE.md` | 프로젝트 설명 틀(Claude Code용) |
 
-> 업데이트를 받을 때 내가 고친 씬·프리팹·`ProjectSettings`·`Packages/manifest.json` 과 겹치면 충돌이 날 수 있습니다.
-> 프로젝트를 시작한 뒤에는 필요할 때만 받습니다.
+2. Unity Hub에서 **Add > Add project from disk** 로 새 폴더를 엽니다. 처음 한 번은 패키지를 받느라 몇 분 걸립니다.
+3. **Edit > Project Settings > Player** 에서 **Product Name** 을 새 프로젝트 이름으로 바꿉니다.
+   앱 로그 폴더와 PlayerPrefs 위치가 Company Name·Product Name으로 정해지므로, 그대로 두면 같은 PC에 설치한 다른 앱과 섞입니다.
+
+> 이미 시작한 프로젝트에는 템플릿 변경이 자동으로 들어가지 않습니다.
+> 공통 코드(HuliacDev Template)와 스택 패키지는 `Tools > Update Stack Packages` 로 올리고, 그 밖의 변경은 필요한 파일만 골라 옮깁니다.
+
+GitHub의 **Code > Download ZIP** 으로 받은 폴더를 템플릿 폴더로 써도 되지만, 그때는 `git pull` 대신 다시 받아야 최신이 됩니다.
 
 ## 들어 있는 것
 
