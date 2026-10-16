@@ -4,6 +4,7 @@
   "targetFrameRate": 60,
   "focusRestoreDelay": 3,
   "focusRestoreRetryInterval": 3,
+  "alwaysOnTop": false,
   "apiUrl": "",
   "closeSetting": {
     "position": { "x": 1.0, "y": 1.0 },

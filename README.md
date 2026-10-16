@@ -55,7 +55,7 @@ GitHub의 **Code > Download ZIP** 으로 받은 폴더를 템플릿 폴더로 �
 
 - **DI 루트:** `Assets/Prefabs/GameLifetimeScope.prefab` 이 VContainerSettings의 Root Lifetime Scope라서 씬에 두지 않아도 자동으로 생깁니다.
   GameManager, APIManager, InactivityTimer, ShutdownScheduler, Reporter(로그 뷰어)가 들어 있습니다.
-- **런타임 설정:** `Assets/StreamingAssets/Settings.json`(무입력 복귀, 프레임레이트, 창 포커스 복구, API 주소, 숨은 종료 버튼)과
+- **런타임 설정:** `Assets/StreamingAssets/Settings.json`(무입력 복귀, 프레임레이트, 창 포커스 복구·항상 위, API 주소, 숨은 종료 버튼)과
   `ShutdownSettings.json`(요일별 자동 종료)은 빌드한 뒤에도 고칠 수 있습니다.
 - **자동 종료 설정 프로그램:** `ShutdownScheduleEditor.exe` 는 용량이 커서(약 150MB) 저장소에 없습니다.
   필요하면 `Tools > Build Shutdown Scheduler Exe` 로 만듭니다(.NET 8 SDK 필요).
