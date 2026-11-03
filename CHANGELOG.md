@@ -1,6 +1,14 @@
 # Changelog
 관람객·운영자 경험에 영향을 주는 변경 사항을 기록합니다. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를 따릅니다.
 
+## [2026-11-03]
+
+### ⚠ Breaking Changes
+- Windows 빌드를 `taskkill /F` 등으로 강제 종료하면 이제 5초 뒤 다시 켜지므로, 점검 중 앱을 끌 때는 숨은 종료 버튼이나 Alt+F4로 끄거나 설정 파일의 `autoRestart`를 끔.
+
+### Added
+- Windows 빌드가 크래시하거나 강제로 꺼지거나 60초 넘게 응답하지 않으면 5초 뒤 앱을 다시 켜며, 숨은 종료 버튼·예약 종료·Alt+F4로 끈 경우는 다시 켜지 않고, 설정 파일의 `autoRestart`로 끄거나 시간을 바꿀 수 있음.
+
 ## [2026-10-16]
 
 ### Added
